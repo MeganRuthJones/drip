@@ -59,16 +59,19 @@ function gf_drip_init() {
 		require_once $class_file;
 	}
 
-	// Register the add-on
+	// Register the add-on - try direct registration first
 	if ( class_exists( 'GF_Drip' ) && class_exists( 'GFAddOn' ) ) {
-		// Ensure we can instantiate the class first
-		$instance = GF_Drip::get_instance();
+		// Method 1: Direct registration with class name
+		GFAddOn::register( 'GF_Drip' );
 		
-		// Register using the class name string
-		// This should work now that we have a valid instance
-		if ( $instance ) {
-			GFAddOn::register( 'GF_Drip' );
+		// Method 2: Also try with callback to get_instance
+		// Some versions of Gravity Forms prefer this
+		if ( method_exists( 'GF_Drip', 'get_instance' ) ) {
+			GFAddOn::register( array( 'GF_Drip', 'get_instance' ) );
 		}
+		
+		// Method 3: Ensure instance exists
+		$instance = GF_Drip::get_instance();
 	}
 }
 
