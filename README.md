@@ -111,6 +111,13 @@ GPL-2.0+
 
 ## Changelog
 
+### 1.0.1
+- Fixed critical error: GFFeedAddOn class not found
+- Improved class loading with wp_loaded hook for better compatibility
+- Added proper class existence checks before requiring files
+- Fixed capability settings to use standard Gravity Forms capabilities
+- Enhanced error handling and safety checks
+
 ### 1.0.0
 - Initial release
 - Basic integration with Drip API

@@ -3,7 +3,7 @@
  * Plugin Name: Gravity Forms Drip Add-On
  * Plugin URI: https://example.com/gravity-forms-drip
  * Description: Integrates Gravity Forms with Drip email marketing platform
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Your Name
  * Author URI: https://example.com
  * Text Domain: gravityforms-drip
@@ -20,7 +20,7 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 // Define plugin constants
-define( 'GF_DRIP_VERSION', '1.0.0' );
+define( 'GF_DRIP_VERSION', '1.0.1' );
 define( 'GF_DRIP_MIN_GF_VERSION', '2.5' );
 define( 'GF_DRIP_PLUGIN_FILE', __FILE__ );
 define( 'GF_DRIP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );

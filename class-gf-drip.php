@@ -4,7 +4,7 @@
  *
  * @package GF_Drip
  * @author  Your Name
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 // If this file is called directly, abort.
