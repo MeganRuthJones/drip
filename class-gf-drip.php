@@ -136,7 +136,6 @@ class GF_Drip extends GFFeedAddOn {
 		return self::$_instance;
 	}
 
-
 	/**
 	 * Plugin starting point
 	 */
