@@ -73,19 +73,16 @@ function gf_drip_init() {
 	if ( file_exists( $class_file ) && ! class_exists( 'GF_Drip' ) ) {
 		require_once $class_file;
 		
-		// Register the add-on
+		// Register the add-on using get_instance method
 		if ( class_exists( 'GFAddOn' ) && class_exists( 'GF_Drip' ) ) {
 			GFAddOn::register( 'GF_Drip' );
 			$initialized = true;
 		}
 	}
 }
-// Use wp_loaded hook which fires after all plugins are loaded
-// This ensures Gravity Forms and all its classes are fully available
-add_action( 'wp_loaded', 'gf_drip_init', 999 );
-
-// Also try gform_loaded as primary hook (Gravity Forms specific)
-add_action( 'gform_loaded', 'gf_drip_init', 999 );
+// Use gform_loaded hook - this is the standard hook for Gravity Forms add-ons
+// Priority 5 ensures it loads early but after Gravity Forms core
+add_action( 'gform_loaded', 'gf_drip_init', 5 );
 
 /**
  * Display notice if Gravity Forms is not installed

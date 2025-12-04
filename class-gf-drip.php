@@ -50,7 +50,7 @@ class GF_Drip extends GFFeedAddOn {
 	 *
 	 * @var string
 	 */
-	protected $_path = 'drip-gravity-forms.php';
+	protected $_path = 'drip-gravity-forms/drip-gravity-forms.php';
 
 	/**
 	 * Full path to this file
@@ -120,6 +120,7 @@ class GF_Drip extends GFFeedAddOn {
 
 		return self::$_instance;
 	}
+
 
 	/**
 	 * Plugin starting point
