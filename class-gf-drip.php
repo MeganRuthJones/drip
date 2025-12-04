@@ -134,7 +134,6 @@ class GF_Drip extends GFFeedAddOn {
 		return self::$_instance;
 	}
 
-
 	/**
 	 * Plugin starting point
 	 */
@@ -143,6 +142,24 @@ class GF_Drip extends GFFeedAddOn {
 
 		// Add AJAX handlers
 		add_action( 'wp_ajax_gf_drip_test_connection', array( $this, 'ajax_test_connection' ) );
+	}
+
+	/**
+	 * Check if plugin settings page should be displayed
+	 * 
+	 * @return bool
+	 */
+	public function has_plugin_settings_page() {
+		return true;
+	}
+
+	/**
+	 * Check if form settings page should be displayed
+	 * 
+	 * @return bool
+	 */
+	public function has_form_settings_page() {
+		return true;
 	}
 
 	/**

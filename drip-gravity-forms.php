@@ -75,7 +75,7 @@ function gf_drip_init() {
 		
 		// Register the add-on - must use class name as string
 		if ( class_exists( 'GFAddOn' ) && class_exists( 'GF_Drip' ) ) {
-			// Register using the class name
+			// Register using the class name - this will create the instance
 			GFAddOn::register( 'GF_Drip' );
 			$initialized = true;
 		}
