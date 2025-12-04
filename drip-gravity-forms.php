@@ -52,8 +52,8 @@ function gf_drip_init() {
 	// CRITICAL: Check if GFAddOn and GFFeedAddOn classes are available BEFORE requiring the class file
 	// GFFeedAddOn extends GFAddOn, so we need both
 	if ( ! class_exists( 'GFAddOn' ) || ! class_exists( 'GFFeedAddOn' ) ) {
-		// Try again later if classes aren't ready yet
-		add_action( 'plugins_loaded', 'gf_drip_init', 20 );
+		// If we're on gform_loaded and classes aren't ready, they should be available soon
+		// Return and let Gravity Forms finish loading
 		return;
 	}
 
