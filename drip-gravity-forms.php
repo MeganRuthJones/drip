@@ -43,6 +43,12 @@ function gf_drip_init() {
 		return;
 	}
 
+	// Ensure Gravity Forms Add-On Framework is included
+	// This must be called before checking for GFAddOn or GFFeedAddOn classes
+	if ( class_exists( 'GFForms' ) && method_exists( 'GFForms', 'include_addon_framework' ) ) {
+		GFForms::include_addon_framework();
+	}
+
 	// CRITICAL: Check if GFAddOn and GFFeedAddOn classes are available BEFORE requiring the class file
 	if ( ! class_exists( 'GFAddOn' ) || ! class_exists( 'GFFeedAddOn' ) ) {
 		return;
@@ -60,16 +66,16 @@ function gf_drip_init() {
 	}
 
 	// Register the add-on
-	// IMPORTANT: Register BEFORE getting instance - GFAddOn::register() will create the instance
+	// GFAddOn::register() expects the class name and will instantiate it
 	if ( class_exists( 'GF_Drip' ) && class_exists( 'GFAddOn' ) ) {
-		// Register using the class name - this is the standard method
+		// Register the add-on - this is the standard method
 		GFAddOn::register( 'GF_Drip' );
 	}
 }
 
 // Use gform_loaded hook - this is the standard hook for Gravity Forms add-ons
-// Priority 5 ensures it loads early but after Gravity Forms core
-add_action( 'gform_loaded', 'gf_drip_init', 5 );
+// Priority 10 ensures it loads after Gravity Forms core is fully initialized
+add_action( 'gform_loaded', 'gf_drip_init', 10 );
 
 /**
  * Display notice if Gravity Forms is not installed

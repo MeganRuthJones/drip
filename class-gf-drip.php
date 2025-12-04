@@ -56,6 +56,8 @@ class GF_Drip extends GFFeedAddOn {
 
 	/**
 	 * Full path to the main plugin file (not this class file)
+	 * Must be set as a class property for GFAddOn::register() to work
+	 * Set it directly if constant is available at class definition time
 	 *
 	 * @var string
 	 */
@@ -76,11 +78,11 @@ class GF_Drip extends GFFeedAddOn {
 	protected $_short_title = 'Drip';
 
 	/**
-	 * Constructor - ensure properties are set before parent constructor
+	 * Constructor
 	 */
 	public function __construct() {
-		// Set full path to main plugin file if not already set
-		if ( empty( $this->_full_path ) && defined( 'GF_DRIP_PLUGIN_FILE' ) ) {
+		// Set full path to main plugin file if constant is defined
+		if ( defined( 'GF_DRIP_PLUGIN_FILE' ) ) {
 			$this->_full_path = GF_DRIP_PLUGIN_FILE;
 		}
 		
@@ -118,6 +120,7 @@ class GF_Drip extends GFFeedAddOn {
 
 	/**
 	 * Singleton instance
+	 * Note: GFAddOn uses its own instance management, but we keep this for compatibility
 	 *
 	 * @var GF_Drip
 	 */
@@ -125,6 +128,7 @@ class GF_Drip extends GFFeedAddOn {
 
 	/**
 	 * Get instance of this class
+	 * GFAddOn::register() will create the instance, so this may not be needed
 	 *
 	 * @return GF_Drip
 	 */
