@@ -30,6 +30,12 @@ define( 'GF_DRIP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
  * Initialize the plugin
  */
 function gf_drip_init() {
+	// Prevent multiple initializations
+	static $initialized = false;
+	if ( $initialized ) {
+		return;
+	}
+
 	// Check if Gravity Forms is installed and activated
 	if ( ! class_exists( 'GFForms' ) ) {
 		add_action( 'admin_notices', 'gf_drip_gravity_forms_required_notice' );
@@ -42,6 +48,26 @@ function gf_drip_init() {
 		return;
 	}
 
+	// CRITICAL: Check if GFAddOn and GFFeedAddOn classes are available BEFORE requiring the class file
+	// GFFeedAddOn extends GFAddOn, so we need both
+	if ( ! class_exists( 'GFAddOn' ) || ! class_exists( 'GFFeedAddOn' ) ) {
+		// If we're on gform_loaded hook, try again on init as fallback
+		if ( did_action( 'gform_loaded' ) && ! did_action( 'init' ) ) {
+			return; // Will be handled by init hook
+		}
+		// If we're on init and still no GFFeedAddOn, show notice
+		if ( did_action( 'init' ) ) {
+			add_action( 'admin_notices', 'gf_drip_feed_addon_not_found_notice' );
+		}
+		return;
+	}
+
+	// Only proceed if we haven't already loaded the class
+	if ( class_exists( 'GF_Drip' ) ) {
+		$initialized = true;
+		return;
+	}
+
 	// Load the add-on class file
 	$class_file = GF_DRIP_PLUGIN_DIR . 'class-gf-drip.php';
 	if ( file_exists( $class_file ) ) {
@@ -50,10 +76,15 @@ function gf_drip_init() {
 		// Register the add-on
 		if ( class_exists( 'GFAddOn' ) && class_exists( 'GF_Drip' ) ) {
 			GFAddOn::register( 'GF_Drip' );
+			$initialized = true;
 		}
 	}
 }
-add_action( 'gform_loaded', 'gf_drip_init', 5 );
+// Try to initialize on gform_loaded with a later priority to ensure all classes are loaded
+add_action( 'gform_loaded', 'gf_drip_init', 20 );
+
+// Fallback: Also try on init hook in case gform_loaded fires too early
+add_action( 'init', 'gf_drip_init_fallback', 20 );
 
 /**
  * Display notice if Gravity Forms is not installed
@@ -83,6 +114,53 @@ function gf_drip_gravity_forms_version_notice() {
 			);
 			?>
 		</p>
+	</div>
+	<?php
+}
+
+/**
+ * Fallback initialization on init hook
+ */
+function gf_drip_init_fallback() {
+	// Only run if not already initialized
+	if ( class_exists( 'GF_Drip' ) ) {
+		return;
+	}
+
+	// Check if Gravity Forms is installed and activated
+	if ( ! class_exists( 'GFForms' ) ) {
+		return;
+	}
+
+	// Check if GFFeedAddOn class is available
+	if ( ! class_exists( 'GFFeedAddOn' ) ) {
+		return;
+	}
+
+	// Check if already initialized via gform_loaded
+	if ( did_action( 'gform_loaded' ) ) {
+		return;
+	}
+
+	// Load the add-on class file
+	$class_file = GF_DRIP_PLUGIN_DIR . 'class-gf-drip.php';
+	if ( file_exists( $class_file ) && ! class_exists( 'GF_Drip' ) ) {
+		require_once $class_file;
+		
+		// Register the add-on
+		if ( class_exists( 'GFAddOn' ) && class_exists( 'GF_Drip' ) ) {
+			GFAddOn::register( 'GF_Drip' );
+		}
+	}
+}
+
+/**
+ * Display notice if GFFeedAddOn class is not found
+ */
+function gf_drip_feed_addon_not_found_notice() {
+	?>
+	<div class="notice notice-error">
+		<p><?php esc_html_e( 'Gravity Forms Drip Add-On requires Gravity Forms to be fully loaded. Please ensure Gravity Forms is installed and activated.', 'gravityforms-drip' ); ?></p>
 	</div>
 	<?php
 }

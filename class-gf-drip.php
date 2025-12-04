@@ -12,6 +12,11 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
+// Only define the class if GFFeedAddOn is available
+if ( ! class_exists( 'GFFeedAddOn' ) ) {
+	return;
+}
+
 /**
  * Main add-on class
  *
