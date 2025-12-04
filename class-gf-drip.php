@@ -75,6 +75,19 @@ class GF_Drip extends GFFeedAddOn {
 	protected $_short_title = 'Drip';
 
 	/**
+	 * Constructor - ensure properties are set before parent constructor
+	 */
+	public function __construct() {
+		// Set full path to main plugin file if not already set
+		if ( empty( $this->_full_path ) && defined( 'GF_DRIP_PLUGIN_FILE' ) ) {
+			$this->_full_path = GF_DRIP_PLUGIN_FILE;
+		}
+		
+		// Call parent constructor
+		parent::__construct();
+	}
+
+	/**
 	 * Capabilities required to access plugin settings
 	 *
 	 * @var string
@@ -127,11 +140,6 @@ class GF_Drip extends GFFeedAddOn {
 	 * Plugin starting point
 	 */
 	public function init() {
-		// Set full path to main plugin file if not set
-		if ( empty( $this->_full_path ) && defined( 'GF_DRIP_PLUGIN_FILE' ) ) {
-			$this->_full_path = GF_DRIP_PLUGIN_FILE;
-		}
-
 		parent::init();
 
 		// Add AJAX handlers
