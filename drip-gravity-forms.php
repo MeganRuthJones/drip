@@ -27,55 +27,43 @@ define( 'GF_DRIP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GF_DRIP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 /**
- * Initialize the plugin
- * This function is called when Gravity Forms is loaded
+ * Loads the Gravity Forms Drip Add-On.
+ *
+ * Includes the main class and registers it with GFAddOn.
+ *
+ * @since 1.0.0
  */
-function gf_drip_init() {
-	// Check if Gravity Forms is installed and activated
-	if ( ! class_exists( 'GFForms' ) ) {
-		add_action( 'admin_notices', 'gf_drip_gravity_forms_required_notice' );
-		return;
-	}
+class GF_Drip_Bootstrap {
 
-	// Check if GFCommon class exists and check Gravity Forms version
-	if ( class_exists( 'GFCommon' ) && ! version_compare( GFCommon::$version, GF_DRIP_MIN_GF_VERSION, '>=' ) ) {
-		add_action( 'admin_notices', 'gf_drip_gravity_forms_version_notice' );
-		return;
-	}
+	/**
+	 * Loads the required files.
+	 *
+	 * @since  1.0.0
+	 */
+	public static function load_addon() {
+		// Check if Gravity Forms is installed and activated
+		if ( ! class_exists( 'GFForms' ) ) {
+			add_action( 'admin_notices', 'gf_drip_gravity_forms_required_notice' );
+			return;
+		}
 
-	// Ensure Gravity Forms Add-On Framework is included
-	// This must be called before checking for GFAddOn or GFFeedAddOn classes
-	if ( class_exists( 'GFForms' ) && method_exists( 'GFForms', 'include_addon_framework' ) ) {
-		GFForms::include_addon_framework();
-	}
+		// Check if GFCommon class exists and check Gravity Forms version
+		if ( class_exists( 'GFCommon' ) && ! version_compare( GFCommon::$version, GF_DRIP_MIN_GF_VERSION, '>=' ) ) {
+			add_action( 'admin_notices', 'gf_drip_gravity_forms_version_notice' );
+			return;
+		}
 
-	// CRITICAL: Check if GFAddOn and GFFeedAddOn classes are available BEFORE requiring the class file
-	if ( ! class_exists( 'GFAddOn' ) || ! class_exists( 'GFFeedAddOn' ) ) {
-		return;
-	}
+		// Requires the class file.
+		// The class file will call GFForms::include_feed_addon_framework() itself
+		require_once plugin_dir_path( __FILE__ ) . 'class-gf-drip.php';
 
-	// Load the add-on class file
-	$class_file = GF_DRIP_PLUGIN_DIR . 'class-gf-drip.php';
-	if ( ! file_exists( $class_file ) ) {
-		return;
-	}
-
-	// Only load if not already loaded
-	if ( ! class_exists( 'GF_Drip' ) ) {
-		require_once $class_file;
-	}
-
-	// Register the add-on
-	// GFAddOn::register() expects the class name and will instantiate it
-	if ( class_exists( 'GF_Drip' ) && class_exists( 'GFAddOn' ) ) {
-		// Register the add-on - this is the standard method
+		// Registers the class name with GFAddOn.
 		GFAddOn::register( 'GF_Drip' );
 	}
 }
 
-// Use gform_loaded hook - this is the standard hook for Gravity Forms add-ons
-// Priority 10 ensures it loads after Gravity Forms core is fully initialized
-add_action( 'gform_loaded', 'gf_drip_init', 10 );
+// After GF is loaded, load the add-on.
+add_action( 'gform_loaded', array( 'GF_Drip_Bootstrap', 'load_addon' ), 5 );
 
 /**
  * Display notice if Gravity Forms is not installed
