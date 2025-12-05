@@ -525,13 +525,14 @@ class GF_Drip extends GFFeedAddOn {
 		// Get email field
 		$email_field_id = rgars( $feed, 'meta/email' );
 		if ( empty( $email_field_id ) ) {
-			$this->log_error( 'Email field is not mapped in feed.' );
+			$this->add_feed_error( esc_html__( 'Email field is not mapped in feed.', 'gravityforms-drip' ), $feed, $entry, $form );
 			return;
 		}
 
-		$email = rgar( $entry, $email_field_id );
+		// Use get_field_value() method from parent class to properly get field value
+		$email = $this->get_field_value( $form, $entry, $email_field_id );
 		if ( empty( $email ) || ! is_email( $email ) ) {
-			$this->log_error( 'Invalid email address: ' . $email );
+			$this->add_feed_error( esc_html__( 'Invalid email address provided.', 'gravityforms-drip' ), $feed, $entry, $form );
 			return;
 		}
 
@@ -548,8 +549,8 @@ class GF_Drip extends GFFeedAddOn {
 		$standard_fields = array( 'first_name', 'last_name', 'phone', 'address', 'city', 'state', 'zip', 'country' );
 		foreach ( $standard_fields as $field_name ) {
 			$field_id = rgars( $feed, 'meta/' . $field_name );
-			if ( ! empty( $field_id ) ) {
-				$field_value = rgar( $entry, $field_id );
+			if ( ! empty( $field_id ) && is_scalar( $field_id ) ) {
+				$field_value = $this->get_field_value( $form, $entry, $field_id );
 				if ( ! empty( $field_value ) ) {
 					$subscriber_data['subscribers'][0][ $field_name ] = sanitize_text_field( $field_value );
 				}
@@ -557,15 +558,20 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		// Map custom fields
+		// dynamic_field_map stores data differently - need to handle it properly
 		$custom_fields = rgars( $feed, 'meta/custom_fields' );
 		if ( ! empty( $custom_fields ) && is_array( $custom_fields ) ) {
 			$subscriber_data['subscribers'][0]['custom_fields'] = array();
 			foreach ( $custom_fields as $drip_field => $gf_field_id ) {
-				if ( ! empty( $gf_field_id ) ) {
-					$field_value = rgar( $entry, $gf_field_id );
-					if ( ! empty( $field_value ) ) {
-						$subscriber_data['subscribers'][0]['custom_fields'][ sanitize_text_field( $drip_field ) ] = sanitize_text_field( $field_value );
-					}
+				// Skip if field ID is empty or not a scalar (not a string/number)
+				if ( empty( $gf_field_id ) || ! is_scalar( $gf_field_id ) ) {
+					continue;
+				}
+				
+				// Use get_field_value() method from parent class
+				$field_value = $this->get_field_value( $form, $entry, $gf_field_id );
+				if ( ! empty( $field_value ) ) {
+					$subscriber_data['subscribers'][0]['custom_fields'][ sanitize_text_field( $drip_field ) ] = sanitize_text_field( $field_value );
 				}
 			}
 		}
@@ -587,7 +593,18 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		// Send to Drip API
-		$this->send_to_drip( $api_token, $account_id, $subscriber_data, $entry );
+		$result = $this->send_to_drip( $api_token, $account_id, $subscriber_data, $entry, $feed, $form );
+		
+		// Check if there was an error
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		
+		// Log success
+		$this->log_debug( __METHOD__ . '(): Subscriber successfully added to Drip.' );
+		$this->add_note( $entry['id'], esc_html__( 'Subscriber successfully added to Drip.', 'gravityforms-drip' ), 'success' );
+		
+		return $entry;
 	}
 
 	/**
@@ -597,9 +614,11 @@ class GF_Drip extends GFFeedAddOn {
 	 * @param string $account_id     Account ID
 	 * @param array  $subscriber_data Subscriber data
 	 * @param array  $entry          Entry object
-	 * @return void
+	 * @param array  $feed           Feed object
+	 * @param array  $form           Form object
+	 * @return bool|WP_Error True on success, WP_Error on failure
 	 */
-	private function send_to_drip( $api_token, $account_id, $subscriber_data, $entry ) {
+	private function send_to_drip( $api_token, $account_id, $subscriber_data, $entry, $feed = null, $form = null ) {
 		$url = sprintf( 'https://api.getdrip.com/v2/%s/subscribers', $account_id );
 
 		$response = wp_remote_post(
@@ -616,8 +635,12 @@ class GF_Drip extends GFFeedAddOn {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			$this->log_error( 'Failed to send subscriber to Drip: ' . $response->get_error_message() );
-			return;
+			$error_message = esc_html__( 'Failed to send subscriber to Drip: ', 'gravityforms-drip' ) . $response->get_error_message();
+			$this->log_error( $error_message );
+			if ( $feed && $form ) {
+				$this->add_feed_error( $error_message, $feed, $entry, $form );
+			}
+			return new WP_Error( 'api_request_failed', $error_message );
 		}
 
 		$response_code = wp_remote_retrieve_response_code( $response );
@@ -626,11 +649,16 @@ class GF_Drip extends GFFeedAddOn {
 		if ( 201 !== $response_code && 200 !== $response_code ) {
 			$error_data = json_decode( $response_body, true );
 			$error_message = isset( $error_data['errors'][0]['message'] ) ? $error_data['errors'][0]['message'] : esc_html__( 'Unknown error occurred.', 'gravityforms-drip' );
-			$this->log_error( 'Drip API error (HTTP ' . $response_code . '): ' . $error_message );
-			return;
+			$full_error = esc_html__( 'Drip API error (HTTP ', 'gravityforms-drip' ) . $response_code . '): ' . $error_message;
+			$this->log_error( $full_error );
+			if ( $feed && $form ) {
+				$this->add_feed_error( $full_error, $feed, $entry, $form );
+			}
+			return new WP_Error( 'api_error', $full_error );
 		}
 
 		$this->log_debug( 'Subscriber successfully sent to Drip: ' . $subscriber_data['subscribers'][0]['email'] );
+		return true;
 	}
 
 	/**
