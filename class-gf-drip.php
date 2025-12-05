@@ -8,14 +8,13 @@
  */
 
 // If this file is called directly, abort.
-if ( ! defined( 'WPINC' ) ) {
-	die;
+if ( ! defined( 'ABSPATH' ) ) {
+	die();
 }
 
-// Only proceed if parent class exists - this check happens in main file before requiring
-if ( ! class_exists( 'GFFeedAddOn' ) ) {
-	return;
-}
+// Include the Gravity Forms Feed Add-On Framework.
+// This MUST be called before the class definition
+GFForms::include_feed_addon_framework();
 
 /**
  * Main add-on class
@@ -55,13 +54,12 @@ class GF_Drip extends GFFeedAddOn {
 	protected $_path = 'drip-main/drip-gravity-forms.php';
 
 	/**
-	 * Full path to the main plugin file (not this class file)
-	 * Must be set as a class property for GFAddOn::register() to work
-	 * Set it directly if constant is available at class definition time
+	 * Full path to this class file
+	 * Following Gravity Forms pattern: use __FILE__ to point to the class file
 	 *
 	 * @var string
 	 */
-	protected $_full_path = '';
+	protected $_full_path = __FILE__;
 
 	/**
 	 * Title of the plugin
@@ -81,11 +79,6 @@ class GF_Drip extends GFFeedAddOn {
 	 * Constructor
 	 */
 	public function __construct() {
-		// Set full path to main plugin file if constant is defined
-		if ( defined( 'GF_DRIP_PLUGIN_FILE' ) ) {
-			$this->_full_path = GF_DRIP_PLUGIN_FILE;
-		}
-		
 		// Call parent constructor
 		parent::__construct();
 	}
