@@ -162,6 +162,21 @@ class GF_Drip extends GFFeedAddOn {
 	}
 
 	/**
+	 * Return the plugin's icon for the plugin/form settings menu.
+	 *
+	 * @since 1.0.1
+	 *
+	 * @return string
+	 */
+	public function get_menu_icon() {
+		$icon_path = $this->get_base_path() . '/images/menu-icon.svg';
+		if ( file_exists( $icon_path ) ) {
+			return file_get_contents( $icon_path );
+		}
+		return '';
+	}
+
+	/**
 	 * Plugin settings fields
 	 *
 	 * @return array
@@ -196,8 +211,8 @@ class GF_Drip extends GFFeedAddOn {
 					array(
 						'name'        => 'test_connection',
 						'type'        => 'test_connection',
-						'label'       => esc_html__( 'Test Connection', 'gravityforms-drip' ),
-						'description' => esc_html__( 'Click the button below to test your API connection.', 'gravityforms-drip' ),
+						'label'       => esc_html__( 'Connect', 'gravityforms-drip' ),
+						'description' => esc_html__( 'Click the button below to connect to Drip.', 'gravityforms-drip' ),
 					),
 				),
 			),
@@ -344,21 +359,61 @@ class GF_Drip extends GFFeedAddOn {
 	 * @return string
 	 */
 	public function settings_test_connection( $field, $echo = true ) {
+		// Check if connection is already established
+		$is_connected = get_transient( 'gf_drip_connection_status' );
+		$api_token = $this->get_plugin_setting( 'api_token' );
+		$account_id = $this->get_plugin_setting( 'account_id' );
+		
+		// If credentials exist and connection was successful, show connected state
+		$button_text = esc_html__( 'Connect', 'gravityforms-drip' );
+		$button_class = 'button button-secondary';
+		
+		if ( $is_connected && ! empty( $api_token ) && ! empty( $account_id ) ) {
+			$button_text = esc_html__( 'Connected', 'gravityforms-drip' );
+			$button_class = 'button button-secondary' . ' gf-drip-connected';
+		}
+
 		$html = sprintf(
-			'<button type="button" id="gf_drip_test_connection" class="button button-secondary">%s</button>',
-			esc_html__( 'Test Connection', 'gravityforms-drip' )
+			'<button type="button" id="gf_drip_test_connection" class="%s">%s</button>',
+			esc_attr( $button_class ),
+			$button_text
 		);
 
 		$html .= '<div id="gf_drip_test_result" style="margin-top: 10px;"></div>';
 
+		// Add CSS for connected state
+		$html .= '<style>
+			.gf-drip-connected {
+				background-color: #00a32a !important;
+				border-color: #00a32a !important;
+				color: #fff !important;
+			}
+			.gf-drip-connected:hover {
+				background-color: #008a20 !important;
+				border-color: #008a20 !important;
+				color: #fff !important;
+			}
+		</style>';
+
 		// Add JavaScript for AJAX test
 		$html .= '<script type="text/javascript">
 			jQuery(document).ready(function($) {
+				// Update button state on page load if connected
+				var isConnected = ' . ( $is_connected ? 'true' : 'false' ) . ';
+				if (isConnected) {
+					$("#gf_drip_test_connection").addClass("gf-drip-connected").text("' . esc_js( __( 'Connected', 'gravityforms-drip' ) ) . '");
+				}
+				
 				$("#gf_drip_test_connection").on("click", function() {
 					var $button = $(this);
 					var $result = $("#gf_drip_test_result");
 					
-					$button.prop("disabled", true).text("' . esc_js( __( 'Testing...', 'gravityforms-drip' ) ) . '");
+					// Don't allow clicking if already connected (unless they want to test again)
+					if ($button.hasClass("gf-drip-connected")) {
+						return;
+					}
+					
+					$button.prop("disabled", true).text("' . esc_js( __( 'Connecting...', 'gravityforms-drip' ) ) . '");
 					$result.html("");
 					
 					$.ajax({
@@ -372,18 +427,27 @@ class GF_Drip extends GFFeedAddOn {
 						},
 						success: function(response) {
 							if (response.success) {
+								$button.removeClass("button-secondary").addClass("gf-drip-connected").text("' . esc_js( __( 'Connected', 'gravityforms-drip' ) ) . '");
 								$result.html("<div class=\'notice notice-success inline\'><p>" + response.data.message + "</p></div>");
 							} else {
 								$result.html("<div class=\'notice notice-error inline\'><p>" + response.data.message + "</p></div>");
 							}
 						},
 						error: function() {
-							$result.html("<div class=\'notice notice-error inline\'><p>' . esc_js( __( 'An error occurred while testing the connection.', 'gravityforms-drip' ) ) . '</p></div>");
+							$result.html("<div class=\'notice notice-error inline\'><p>' . esc_js( __( 'An error occurred while connecting.', 'gravityforms-drip' ) ) . '</p></div>");
 						},
 						complete: function() {
-							$button.prop("disabled", false).text("' . esc_js( __( 'Test Connection', 'gravityforms-drip' ) ) . '");
+							$button.prop("disabled", false);
+							if (!$button.hasClass("gf-drip-connected")) {
+								$button.text("' . esc_js( __( 'Connect', 'gravityforms-drip' ) ) . '");
+							}
 						}
 					});
+				});
+				
+				// Reset connection state if API token or account ID changes
+				$("#api_token, #account_id").on("change", function() {
+					$("#gf_drip_test_connection").removeClass("gf-drip-connected").text("' . esc_js( __( 'Connect', 'gravityforms-drip' ) ) . '");
 				});
 			});
 		</script>';
@@ -419,10 +483,14 @@ class GF_Drip extends GFFeedAddOn {
 		$result = $this->test_api_connection( $api_token, $account_id );
 
 		if ( is_wp_error( $result ) ) {
+			// Clear connection status on failure
+			delete_transient( 'gf_drip_connection_status' );
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
 
-		wp_send_json_success( array( 'message' => esc_html__( 'Connection successful! Your API credentials are valid.', 'gravityforms-drip' ) ) );
+		// Store connection status for 1 hour
+		set_transient( 'gf_drip_connection_status', true, HOUR_IN_SECONDS );
+		wp_send_json_success( array( 'message' => esc_html__( 'Successfully connected to Drip!', 'gravityforms-drip' ) ) );
 	}
 
 	/**
@@ -655,6 +723,82 @@ class GF_Drip extends GFFeedAddOn {
 	public function get_plugin_settings() {
 		$settings = parent::get_plugin_settings();
 		return $settings;
+	}
+
+	/**
+	 * Configures which columns should be displayed on the feed list page.
+	 *
+	 * @since 1.0.1
+	 * @access public
+	 *
+	 * @return array
+	 */
+	public function feed_list_columns() {
+		return array(
+			'feedName' => esc_html__( 'Feed Name', 'gravityforms-drip' ),
+			'email'    => esc_html__( 'Email Field', 'gravityforms-drip' ),
+			'tags'     => esc_html__( 'Tags', 'gravityforms-drip' ),
+		);
+	}
+
+	/**
+	 * Returns the value to be displayed in the Email column.
+	 *
+	 * @since 1.0.1
+	 * @access public
+	 *
+	 * @param array $feed The feed being included in the feed list.
+	 *
+	 * @return string Email field label. Empty string on failure.
+	 */
+	public function get_column_value_email( $feed ) {
+		$email_field_id = isset( $feed['meta']['email'] ) ? $feed['meta']['email'] : '';
+		if ( empty( $email_field_id ) ) {
+			return esc_html__( 'Not mapped', 'gravityforms-drip' );
+		}
+
+		// Get the form to find the field label
+		$form_id = isset( $feed['form_id'] ) ? $feed['form_id'] : 0;
+		if ( empty( $form_id ) ) {
+			return esc_html__( 'Unknown', 'gravityforms-drip' );
+		}
+
+		$form = GFAPI::get_form( $form_id );
+		if ( is_wp_error( $form ) || empty( $form ) ) {
+			return esc_html__( 'Form not found', 'gravityforms-drip' );
+		}
+
+		$field = GFAPI::get_field( $form, $email_field_id );
+		if ( is_wp_error( $field ) || empty( $field ) ) {
+			return esc_html__( 'Field not found', 'gravityforms-drip' );
+		}
+
+		return esc_html( $field->label );
+	}
+
+	/**
+	 * Returns the value to be displayed in the Tags column.
+	 *
+	 * @since 1.0.1
+	 * @access public
+	 *
+	 * @param array $feed The feed being included in the feed list.
+	 *
+	 * @return string Tags. Empty string if no tags.
+	 */
+	public function get_column_value_tags( $feed ) {
+		$tags = isset( $feed['meta']['tags'] ) ? $feed['meta']['tags'] : '';
+		if ( empty( $tags ) ) {
+			return esc_html__( '—', 'gravityforms-drip' );
+		}
+
+		// Limit display to first 50 characters
+		$tags_display = esc_html( $tags );
+		if ( strlen( $tags_display ) > 50 ) {
+			$tags_display = substr( $tags_display, 0, 50 ) . '...';
+		}
+
+		return $tags_display;
 	}
 
 	/**
