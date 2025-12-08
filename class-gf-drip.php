@@ -138,6 +138,35 @@ class GF_Drip extends GFFeedAddOn {
 	 */
 	public function init() {
 		parent::init();
+		
+		// Add JavaScript to show connection status message after page load
+		add_action( 'admin_footer', array( $this, 'output_connection_status_script' ) );
+	}
+	
+	/**
+	 * Output JavaScript to display connection status message
+	 */
+	public function output_connection_status_script() {
+		// Only show on plugin settings page
+		if ( ! $this->is_plugin_settings( $this->get_slug() ) ) {
+			return;
+		}
+		
+		$is_connected = get_transient( 'gf_drip_connection_status' );
+		$connection_error = get_transient( 'gf_drip_connection_error' );
+		
+		?>
+		<script type="text/javascript">
+		jQuery(document).ready(function($) {
+			var statusMessage = $('#gf_drip_connection_status_message');
+			<?php if ( $is_connected ) : ?>
+				statusMessage.html('<span style="color: #00a32a; font-weight: bold;">✓ ' + '<?php echo esc_js( __( 'Account connected', 'gravityforms-drip' ) ); ?>' + '</span>');
+			<?php elseif ( $connection_error ) : ?>
+				statusMessage.html('<span style="color: #d63638; font-weight: bold;">✗ ' + '<?php echo esc_js( $connection_error ); ?>' + '</span>');
+			<?php endif; ?>
+		});
+		</script>
+		<?php
 	}
 
 	/**
@@ -194,7 +223,7 @@ class GF_Drip extends GFFeedAddOn {
 						/* translators: %s: Link to Drip API documentation */
 						esc_html__( 'Enter your Drip API token. You can find this in your Drip account under Settings > User Settings > API Token. %s', 'gravityforms-drip' ),
 						'<a href="https://www.getdrip.com/user/edit" target="_blank">' . esc_html__( 'Get your API token', 'gravityforms-drip' ) . '</a>'
-					),
+					) . '<div id="gf_drip_connection_status_message" style="margin-top: 10px;"></div>',
 				),
 				array(
 					'name'              => 'account_id',
@@ -443,19 +472,22 @@ class GF_Drip extends GFFeedAddOn {
 		$is_connected = get_transient( 'gf_drip_connection_status' );
 		$connection_error = get_transient( 'gf_drip_connection_error' );
 		
-		// If we have saved credentials, show their status
+		// Get saved credentials
 		$api_token = $this->get_plugin_setting( 'api_token' );
 		$account_id = $this->get_plugin_setting( 'account_id' );
 		
+		// If we have saved credentials, show their status
 		if ( ! empty( $api_token ) && ! empty( $account_id ) ) {
 			if ( $is_connected ) {
-				return true; // Show green tick
+				// Show green tick - connection successful
+				return true;
 			} elseif ( $connection_error ) {
-				return false; // Show red tick
+				// Show red tick - connection failed
+				return false;
 			}
 		}
 		
-		// No status yet - return null to show no feedback
+		// No status yet - return null to show no feedback until settings are saved
 		return null;
 	}
 
