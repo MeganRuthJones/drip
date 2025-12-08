@@ -141,6 +141,47 @@ class GF_Drip extends GFFeedAddOn {
 		
 		// Add JavaScript to show connection status message after page load
 		add_action( 'admin_footer', array( $this, 'output_connection_status_script' ) );
+		
+		// Hook into settings save to test connection
+		add_action( 'gform_post_update_plugin_settings', array( $this, 'test_connection_after_save' ), 10, 2 );
+	}
+	
+	/**
+	 * Test connection after settings are saved
+	 *
+	 * @param array $settings Settings that were saved
+	 * @param string $slug    Add-on slug
+	 */
+	public function test_connection_after_save( $settings, $slug ) {
+		// Only run for this add-on
+		if ( $slug !== $this->get_slug() ) {
+			return;
+		}
+		
+		// Get the saved settings
+		$api_token = isset( $settings['api_token'] ) ? $settings['api_token'] : '';
+		$account_id = isset( $settings['account_id'] ) ? $settings['account_id'] : '';
+		
+		// Test connection if both are provided
+		if ( ! empty( $api_token ) && ! empty( $account_id ) ) {
+			$this->log_debug( 'Testing Drip API connection after settings save...' );
+			$connection_result = $this->test_api_connection( $api_token, $account_id );
+			
+			if ( is_wp_error( $connection_result ) ) {
+				$error_message = $connection_result->get_error_message();
+				$this->log_error( 'Drip API connection test failed: ' . $error_message );
+				delete_transient( 'gf_drip_connection_status' );
+				set_transient( 'gf_drip_connection_error', $error_message, 300 );
+			} else {
+				$this->log_debug( 'Drip API connection test successful!' );
+				set_transient( 'gf_drip_connection_status', true, HOUR_IN_SECONDS );
+				delete_transient( 'gf_drip_connection_error' );
+			}
+		} else {
+			// Clear status if credentials are missing
+			delete_transient( 'gf_drip_connection_status' );
+			delete_transient( 'gf_drip_connection_error' );
+		}
 	}
 	
 	/**
