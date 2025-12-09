@@ -43,7 +43,7 @@ class GF_Drip extends GFFeedAddOn {
 	 *
 	 * @var string
 	 */
-	protected $_slug = 'drip';
+	protected $_slug = 'gravityformsdrip';
 
 	/**
 	 * Plugin path (relative to plugins folder)
@@ -468,8 +468,8 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		// Test by fetching account info
-		// Drip API v2: GET /accounts/{account_id} to verify account access
-		$url = sprintf( 'https://api.getdrip.com/v2/accounts/%s', sanitize_text_field( $account_id ) );
+		// Drip API v2: GET /accounts to verify token, then confirm account exists
+		$url = 'https://api.getdrip.com/v2/accounts';
 		
 		$this->log_debug( 'Testing Drip API connection to: ' . $url );
 
@@ -502,6 +502,18 @@ class GF_Drip extends GFFeedAddOn {
 			$this->log_error( 'API connection test failed: HTTP ' . $response_code . ' - ' . $error_message );
 			$this->log_error( 'Response body: ' . substr( $response_body, 0, 500 ) ); // Log first 500 chars
 			return new WP_Error( 'invalid_credentials', $error_message );
+		}
+
+		$decoded = json_decode( $response_body, true );
+		if ( json_last_error() !== JSON_ERROR_NONE || empty( $decoded['accounts'] ) ) {
+			$this->log_error( 'API connection test failed: could not parse accounts response.' );
+			return new WP_Error( 'invalid_response', esc_html__( 'Unexpected response from Drip API.', 'gravityforms-drip' ) );
+		}
+
+		$account_ids = wp_list_pluck( $decoded['accounts'], 'id' );
+		if ( ! in_array( (string) $account_id, $account_ids, true ) ) {
+			$this->log_error( 'API connection test failed: account ID not found in Drip account list.' );
+			return new WP_Error( 'invalid_account', esc_html__( 'Account ID not found for this token.', 'gravityforms-drip' ) );
 		}
 
 		$this->log_debug( 'Drip API connection test successful!' );
