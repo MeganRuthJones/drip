@@ -540,6 +540,13 @@ class GF_Drip extends GFFeedAddOn {
 		$api_token  = ! empty( $posted_api_token ) ? $posted_api_token : $this->get_plugin_setting( 'api_token' );
 		$account_id = ! empty( $posted_account_id ) ? $posted_account_id : $this->get_plugin_setting( 'account_id' );
 
+		// If credentials are blank, clear state and show no feedback.
+		if ( empty( $api_token ) || empty( $account_id ) ) {
+			delete_transient( 'gf_drip_connection_status' );
+			delete_transient( 'gf_drip_connection_error' );
+			return null;
+		}
+
 		// If we already have a cached status, honor it
 		if ( $is_connected ) {
 			return true;
