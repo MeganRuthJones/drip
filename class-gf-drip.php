@@ -529,26 +529,40 @@ class GF_Drip extends GFFeedAddOn {
 	 * @return bool|null True if connection is valid, false on failure, null if not tested
 	 */
 	public function validate_api_connection( $value ) {
-		// Check if we have a connection status from the last save
-		$is_connected = get_transient( 'gf_drip_connection_status' );
+		// Check cached status first
+		$is_connected     = get_transient( 'gf_drip_connection_status' );
 		$connection_error = get_transient( 'gf_drip_connection_error' );
-		
-		// Get saved credentials
-		$api_token = $this->get_plugin_setting( 'api_token' );
-		$account_id = $this->get_plugin_setting( 'account_id' );
-		
-		// If we have saved credentials, show their status
+
+		// Prefer freshly submitted values (during settings save UI)
+		$posted_api_token  = isset( $_POST['api_token'] ) ? sanitize_text_field( wp_unslash( $_POST['api_token'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$posted_account_id = isset( $_POST['account_id'] ) ? sanitize_text_field( wp_unslash( $_POST['account_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+
+		$api_token  = ! empty( $posted_api_token ) ? $posted_api_token : $this->get_plugin_setting( 'api_token' );
+		$account_id = ! empty( $posted_account_id ) ? $posted_account_id : $this->get_plugin_setting( 'account_id' );
+
+		// If we already have a cached status, honor it
+		if ( $is_connected ) {
+			return true;
+		}
+		if ( $connection_error ) {
+			return false;
+		}
+
+		// If both credentials are present but no cached status, test now so feedback shows immediately
 		if ( ! empty( $api_token ) && ! empty( $account_id ) ) {
-			if ( $is_connected ) {
-				// Show green tick - connection successful
-				return true;
-			} elseif ( $connection_error ) {
-				// Show red tick - connection failed
+			$result = $this->test_api_connection( $api_token, $account_id );
+			if ( is_wp_error( $result ) ) {
+				set_transient( 'gf_drip_connection_error', $result->get_error_message(), 300 );
+				delete_transient( 'gf_drip_connection_status' );
 				return false;
 			}
+
+			set_transient( 'gf_drip_connection_status', true, HOUR_IN_SECONDS );
+			delete_transient( 'gf_drip_connection_error' );
+			return true;
 		}
-		
-		// No status yet - return null to show no feedback until settings are saved
+
+		// No credentials or no status yet
 		return null;
 	}
 
