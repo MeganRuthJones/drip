@@ -145,7 +145,8 @@ class GF_Drip extends GFFeedAddOn {
 						'type'              => 'text',
 						'class'             => 'medium',
 						'required'          => true,
-						'feedback_callback' => array( $this, 'is_valid_api_token' ),
+						// Use live API validation for feedback, similar to EmailOctopus.
+						'feedback_callback' => array( $this, 'validate_api_credentials' ),
 						'description'       => sprintf(
 							/* translators: %s: Link to Drip API documentation */
 							esc_html__( 'Enter your Drip API token. You can find this in your Drip account under Settings > User Settings > API Token. %s', 'gravityforms-drip' ),
@@ -153,13 +154,12 @@ class GF_Drip extends GFFeedAddOn {
 						),
 					),
 					array(
-						'name'              => 'account_id',
-						'label'             => esc_html__( 'Account ID', 'gravityforms-drip' ),
-						'type'              => 'text',
-						'class'             => 'medium',
-						'required'          => true,
-						'feedback_callback' => array( $this, 'is_valid_account_id' ),
-						'description'       => esc_html__( 'Enter your Drip Account ID. You can find this in your Drip account URL (e.g., https://www.getdrip.com/{account_id}/).', 'gravityforms-drip' ),
+						'name'        => 'account_id',
+						'label'       => esc_html__( 'Account ID', 'gravityforms-drip' ),
+						'type'        => 'text',
+						'class'       => 'medium',
+						'required'    => true,
+						'description' => esc_html__( 'Enter your Drip Account ID. You can find this in your Drip account URL (e.g., https://www.getdrip.com/{account_id}/).', 'gravityforms-drip' ),
 					),
 					array(
 						'name'        => 'test_connection',
@@ -437,9 +437,16 @@ class GF_Drip extends GFFeedAddOn {
 		$response_body = wp_remote_retrieve_body( $response );
 
 		if ( 200 !== $response_code ) {
-			$error_data = json_decode( $response_body, true );
-			$error_message = isset( $error_data['errors'][0]['message'] ) ? $error_data['errors'][0]['message'] : esc_html__( 'Invalid API credentials.', 'gravityforms-drip' );
+			$error_data    = json_decode( $response_body, true );
+			$error_message = isset( $error_data['errors'][0]['message'] ) ? $error_data['errors'][0]['message'] : '';
+
+			if ( empty( $error_message ) ) {
+				// Fall back to a generic, less alarming message if the API didn't provide details.
+				$error_message = esc_html__( 'Unable to verify your Drip API credentials. Please check your token and Account ID, save your settings, and try again.', 'gravityforms-drip' );
+			}
+
 			$this->log_error( 'API connection test failed: HTTP ' . $response_code . ' - ' . $error_message );
+
 			return new WP_Error( 'invalid_credentials', $error_message );
 		}
 
@@ -454,6 +461,34 @@ class GF_Drip extends GFFeedAddOn {
 	 */
 	public function is_valid_api_token( $value ) {
 		return ! empty( $value ) && strlen( $value ) > 10;
+	}
+
+	/**
+	 * Validate API credentials against the Drip API for settings feedback.
+	 *
+	 * This is used as the feedback_callback for the API Token field so that
+	 * the UI only shows a success icon when the provided token (and current
+	 * Account ID value) are actually accepted by Drip, similar to EmailOctopus.
+	 *
+	 * @param string $api_token API token value from the settings field.
+	 *
+	 * @return bool True if credentials are valid, false otherwise.
+	 */
+	public function validate_api_credentials( $api_token ) {
+		// Get the account ID from the posted settings (unsaved) or fall back to saved settings.
+		$account_id = rgpost( '_gaddon_setting_account_id' );
+		if ( empty( $account_id ) ) {
+			$account_id = $this->get_plugin_setting( 'account_id' );
+		}
+
+		// If either value is missing, we can't validate yet.
+		if ( empty( $api_token ) || empty( $account_id ) ) {
+			return false;
+		}
+
+		$result = $this->test_api_connection( $api_token, $account_id );
+
+		return ! is_wp_error( $result );
 	}
 
 	/**
@@ -651,5 +686,47 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		return $sanitized;
+	}
+
+	/**
+	 * Configure which columns should be displayed on the feed list page.
+	 *
+	 * This mirrors the default behaviour but allows us to ensure a visible name
+	 * for older feeds which may not have the feedName meta populated.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return array
+	 */
+	public function feed_list_columns() {
+		return array(
+			'feedName' => esc_html__( 'Name', 'gravityforms-drip' ),
+		);
+	}
+
+	/**
+	 * Return the value to be displayed in the Feed Name column.
+	 *
+	 * Ensures pre-existing feeds without a stored feedName still render a
+	 * clickable label so they can be edited.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array $feed The feed being included in the feed list.
+	 *
+	 * @return string
+	 */
+	public function get_column_value_feedName( $feed ) {
+		$name = rgar( $feed['meta'], 'feedName' );
+
+		if ( empty( $name ) ) {
+			$name = sprintf(
+				/* translators: %d is the feed ID. */
+				esc_html__( 'Drip Feed #%d', 'gravityforms-drip' ),
+				rgar( $feed, 'id' )
+			);
+		}
+
+		return $name;
 	}
 }
