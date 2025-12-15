@@ -256,7 +256,7 @@ class GF_Drip extends GFFeedAddOn {
 				array(
 					'name'              => 'api_token',
 					'label'             => esc_html__( 'API Token', 'gravityforms-drip' ),
-					'type'              => 'text',
+					'type'              => 'password',
 					'class'             => 'medium',
 					'required'          => true,
 					'feedback_callback' => array( $this, 'validate_api_connection' ),
@@ -273,7 +273,7 @@ class GF_Drip extends GFFeedAddOn {
 					'class'             => 'medium',
 					'required'          => true,
 					'feedback_callback' => array( $this, 'validate_api_connection' ),
-					'description'       => esc_html__( 'Enter your Drip Account ID. You can find this in your Drip account URL (e.g., https://www.getdrip.com/{account_id}/).', 'gravityforms-drip' ),
+					'description'       => esc_html__( 'Enter your Drip Account ID. You can paste the numeric ID (e.g., 123456) or your full account URL (e.g., https://www.getdrip.com/123456/).', 'gravityforms-drip' ),
 				),
 				),
 			),
@@ -427,8 +427,8 @@ class GF_Drip extends GFFeedAddOn {
 			wp_send_json_error( array( 'message' => esc_html__( 'You do not have permission to perform this action.', 'gravityforms-drip' ) ) );
 		}
 
-		$api_token = isset( $_POST['api_token'] ) ? sanitize_text_field( wp_unslash( $_POST['api_token'] ) ) : '';
-		$account_id = isset( $_POST['account_id'] ) ? sanitize_text_field( wp_unslash( $_POST['account_id'] ) ) : '';
+		$api_token  = isset( $_POST['api_token'] ) ? sanitize_text_field( wp_unslash( $_POST['api_token'] ) ) : '';
+		$account_id = isset( $_POST['account_id'] ) ? $this->normalize_account_id( sanitize_text_field( wp_unslash( $_POST['account_id'] ) ) ) : '';
 
 		if ( empty( $api_token ) || empty( $account_id ) ) {
 			wp_send_json_error( array( 'message' => esc_html__( 'API token and Account ID are required.', 'gravityforms-drip' ) ) );
@@ -463,13 +463,15 @@ class GF_Drip extends GFFeedAddOn {
 			$account_id = $this->get_plugin_setting( 'account_id' );
 		}
 
+		$account_id = $this->normalize_account_id( $account_id );
+
 		if ( empty( $api_token ) || empty( $account_id ) ) {
 			return new WP_Error( 'missing_credentials', esc_html__( 'API token and Account ID are required.', 'gravityforms-drip' ) );
 		}
 
-		// Test by fetching account info
-		// Drip API v2: GET /accounts to verify token, then confirm account exists
-		$url = 'https://api.getdrip.com/v2/accounts';
+		// Test using an account-scoped endpoint so we validate both the token and account ID.
+		// Keep the response lightweight by only requesting a single record.
+		$url = sprintf( 'https://api.getdrip.com/v2/%s/campaigns?per_page=1', rawurlencode( (string) $account_id ) );
 		
 		$this->log_debug( 'Testing Drip API connection to: ' . $url );
 
@@ -496,24 +498,23 @@ class GF_Drip extends GFFeedAddOn {
 
 		$this->log_debug( 'Drip API response code: ' . $response_code );
 
-		if ( 200 !== $response_code ) {
+		if ( 200 !== (int) $response_code ) {
+			$error_message = esc_html__( 'Invalid API credentials.', 'gravityforms-drip' );
+
 			$error_data = json_decode( $response_body, true );
-			$error_message = isset( $error_data['errors'][0]['message'] ) ? $error_data['errors'][0]['message'] : esc_html__( 'Invalid API credentials.', 'gravityforms-drip' );
+			if ( is_array( $error_data ) && isset( $error_data['errors'][0]['message'] ) ) {
+				$error_message = (string) $error_data['errors'][0]['message'];
+			} else {
+				$error_message = sprintf(
+					/* translators: 1: HTTP status code */
+					esc_html__( 'Drip API request failed (HTTP %1$d). Please verify your API token and Account ID.', 'gravityforms-drip' ),
+					(int) $response_code
+				);
+			}
+
 			$this->log_error( 'API connection test failed: HTTP ' . $response_code . ' - ' . $error_message );
-			$this->log_error( 'Response body: ' . substr( $response_body, 0, 500 ) ); // Log first 500 chars
+			$this->log_error( 'Response body: ' . substr( (string) $response_body, 0, 500 ) ); // Log first 500 chars.
 			return new WP_Error( 'invalid_credentials', $error_message );
-		}
-
-		$decoded = json_decode( $response_body, true );
-		if ( json_last_error() !== JSON_ERROR_NONE || empty( $decoded['accounts'] ) ) {
-			$this->log_error( 'API connection test failed: could not parse accounts response.' );
-			return new WP_Error( 'invalid_response', esc_html__( 'Unexpected response from Drip API.', 'gravityforms-drip' ) );
-		}
-
-		$account_ids = wp_list_pluck( $decoded['accounts'], 'id' );
-		if ( ! in_array( (string) $account_id, $account_ids, true ) ) {
-			$this->log_error( 'API connection test failed: account ID not found in Drip account list.' );
-			return new WP_Error( 'invalid_account', esc_html__( 'Account ID not found for this token.', 'gravityforms-drip' ) );
 		}
 
 		$this->log_debug( 'Drip API connection test successful!' );
@@ -539,6 +540,7 @@ class GF_Drip extends GFFeedAddOn {
 
 		$api_token  = ! empty( $posted_api_token ) ? $posted_api_token : $this->get_plugin_setting( 'api_token' );
 		$account_id = ! empty( $posted_account_id ) ? $posted_account_id : $this->get_plugin_setting( 'account_id' );
+		$account_id = $this->normalize_account_id( $account_id );
 
 		// If credentials are blank, clear state and show no feedback.
 		if ( empty( $api_token ) || empty( $account_id ) ) {
@@ -590,7 +592,7 @@ class GF_Drip extends GFFeedAddOn {
 
 		// Get API credentials
 		$api_token = $this->get_plugin_setting( 'api_token' );
-		$account_id = $this->get_plugin_setting( 'account_id' );
+		$account_id = $this->normalize_account_id( $this->get_plugin_setting( 'account_id' ) );
 
 		if ( empty( $api_token ) || empty( $account_id ) ) {
 			$this->log_error( 'API credentials are not configured.' );
@@ -682,7 +684,12 @@ class GF_Drip extends GFFeedAddOn {
 	 * @return void
 	 */
 	private function send_to_drip( $api_token, $account_id, $subscriber_data, $entry ) {
-		$url = sprintf( 'https://api.getdrip.com/v2/%s/subscribers', $account_id );
+		$account_id = $this->normalize_account_id( $account_id );
+		if ( empty( $account_id ) ) {
+			return new WP_Error( 'missing_account_id', esc_html__( 'Account ID is required.', 'gravityforms-drip' ) );
+		}
+
+		$url = sprintf( 'https://api.getdrip.com/v2/%s/subscribers', rawurlencode( (string) $account_id ) );
 
 		$response = wp_remote_post(
 			$url,
@@ -835,35 +842,17 @@ class GF_Drip extends GFFeedAddOn {
 			return false;
 		}
 
-		// Get existing feeds for this form
-		$feeds = $this->get_feeds( $form_id );
-
-		// Only allow creating new feeds if at least one feed already exists
-		return ! empty( $feeds ) && count( $feeds ) > 0;
-		
-		/* COMMENTED OUT - Fix to allow first feed when settings are configured
 		// Check if settings are configured
 		$api_token = $this->get_plugin_setting( 'api_token' );
-		$account_id = $this->get_plugin_setting( 'account_id' );
+		$account_id = $this->normalize_account_id( $this->get_plugin_setting( 'account_id' ) );
 		
 		// If settings are not configured, don't allow feed creation
 		if ( empty( $api_token ) || empty( $account_id ) ) {
 			return false;
 		}
 
-		// Get existing feeds for this form
-		$feeds = $this->get_feeds( $form_id );
-
-		// Allow creating the first feed if settings are configured
-		// Only allow creating additional feeds if at least one feed already exists
-		if ( empty( $feeds ) || count( $feeds ) === 0 ) {
-			// First feed - allow if settings are configured
-			return true;
-		}
-
-		// Additional feeds - only allow if at least one feed exists
-		return count( $feeds ) > 0;
-		*/
+		// Settings are configured; allow creating feeds (including the first one).
+		return true;
 	}
 
 	/**
@@ -882,7 +871,7 @@ class GF_Drip extends GFFeedAddOn {
 
 		// Sanitize Account ID
 		if ( isset( $sanitized['account_id'] ) ) {
-			$sanitized['account_id'] = sanitize_text_field( $sanitized['account_id'] );
+			$sanitized['account_id'] = $this->normalize_account_id( sanitize_text_field( $sanitized['account_id'] ) );
 		}
 
 		// Test connection when both fields are present and have values
@@ -917,5 +906,47 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		return $sanitized;
+	}
+
+	/**
+	 * Normalize the Account ID value.
+	 *
+	 * Users often paste a full URL (e.g. https://www.getdrip.com/123456/).
+	 * This method extracts the account ID and returns a trimmed string.
+	 *
+	 * @param string $account_id_raw Raw account ID or URL.
+	 * @return string Normalized account ID.
+	 */
+	private function normalize_account_id( $account_id_raw ) {
+		$account_id_raw = is_scalar( $account_id_raw ) ? (string) $account_id_raw : '';
+		$account_id_raw = trim( $account_id_raw );
+
+		if ( '' === $account_id_raw ) {
+			return '';
+		}
+
+		// If it's a URL, extract the first path segment.
+		if ( false !== strpos( $account_id_raw, '://' ) ) {
+			$parsed = wp_parse_url( $account_id_raw );
+			if ( is_array( $parsed ) && ! empty( $parsed['path'] ) ) {
+				$path  = trim( (string) $parsed['path'], '/' );
+				$parts = explode( '/', $path );
+				if ( ! empty( $parts[0] ) ) {
+					$account_id_raw = (string) $parts[0];
+				}
+			}
+		}
+
+		// If it's a path-like value, take the first segment.
+		if ( false !== strpos( $account_id_raw, '/' ) ) {
+			$parts = explode( '/', trim( $account_id_raw, '/' ) );
+			if ( ! empty( $parts[0] ) ) {
+				$account_id_raw = (string) $parts[0];
+			}
+		}
+
+		// Drip account IDs are typically numeric; keep digits if present.
+		$numeric = preg_replace( '/\D+/', '', $account_id_raw );
+		return '' !== $numeric ? $numeric : $account_id_raw;
 	}
 }
