@@ -12,10 +12,13 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-// Only proceed if parent class exists - this check happens in main file before requiring
+// Only proceed if parent class exists - this check happens in main file before requiring.
 if ( ! class_exists( 'GFFeedAddOn' ) ) {
 	return;
 }
+
+// Include the Gravity Forms Feed Add-On Framework, mirroring the EmailOctopus add-on.
+GFForms::include_feed_addon_framework();
 
 /**
  * Main add-on class
@@ -296,6 +299,34 @@ class GF_Drip extends GFFeedAddOn {
 				'fields' => $additional_settings,
 			),
 		);
+	}
+
+	/**
+	 * Form settings page title.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string
+	 */
+	public function feed_settings_title() {
+		return esc_html__( 'Feed Settings', 'gravityforms-drip' );
+	}
+
+	/**
+	 * Return the plugin's icon for the plugin/form settings menu.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string
+	 */
+	public function get_menu_icon() {
+		$icon_path = GF_DRIP_PLUGIN_DIR . 'images/menu-icon.svg';
+
+		if ( file_exists( $icon_path ) ) {
+			return file_get_contents( $icon_path );
+		}
+
+		return '';
 	}
 
 	/**
