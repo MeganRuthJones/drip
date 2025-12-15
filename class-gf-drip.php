@@ -331,8 +331,8 @@ class GF_Drip extends GFFeedAddOn {
 			return new WP_Error( 'missing_credentials', esc_html__( 'API token and Account ID are required.', 'gravityforms-drip' ) );
 		}
 
-		// Test by fetching user info - this endpoint validates credentials and returns user data.
-		$url = sprintf( 'https://api.getdrip.com/v2/%s/user', $account_id );
+		// Test by fetching subscribers with limit=1 - this validates credentials using an endpoint we know works.
+		$url = sprintf( 'https://api.getdrip.com/v2/%s/subscribers?limit=1', $account_id );
 
 		$response = wp_remote_get(
 			$url,
