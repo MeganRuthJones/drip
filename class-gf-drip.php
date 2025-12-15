@@ -12,8 +12,10 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-// Ensure the Gravity Forms Feed Add-On Framework is loaded, mirroring other GF add-ons.
-GFForms::include_feed_addon_framework();
+// Only proceed if parent class exists - this check happens in main file before requiring
+if ( ! class_exists( 'GFFeedAddOn' ) ) {
+	return;
+}
 
 /**
  * Main add-on class
@@ -524,17 +526,23 @@ class GF_Drip extends GFFeedAddOn {
 			}
 		}
 
-		// Map custom fields
+		// Map custom fields.
+		// The dynamic_field_map setting stores an associative array of Drip field name => GF field ID.
 		$custom_fields = rgars( $feed, 'meta/custom_fields' );
 		if ( ! empty( $custom_fields ) && is_array( $custom_fields ) ) {
 			$subscriber_data['subscribers'][0]['custom_fields'] = array();
+
 			foreach ( $custom_fields as $drip_field => $gf_field_id ) {
-				if ( ! empty( $gf_field_id ) ) {
-					$field_value = rgar( $entry, $gf_field_id );
-					if ( ! empty( $field_value ) ) {
-						$subscriber_data['subscribers'][0]['custom_fields'][ sanitize_text_field( $drip_field ) ] = sanitize_text_field( $field_value );
-					}
+				if ( empty( $drip_field ) || empty( $gf_field_id ) ) {
+					continue;
 				}
+
+				$field_value = rgar( $entry, $gf_field_id );
+				if ( $field_value === '' || $field_value === null ) {
+					continue;
+				}
+
+				$subscriber_data['subscribers'][0]['custom_fields'][ sanitize_text_field( $drip_field ) ] = sanitize_text_field( $field_value );
 			}
 		}
 
