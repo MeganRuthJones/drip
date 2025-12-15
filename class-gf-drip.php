@@ -331,8 +331,8 @@ class GF_Drip extends GFFeedAddOn {
 			return new WP_Error( 'missing_credentials', esc_html__( 'API token and Account ID are required.', 'gravityforms-drip' ) );
 		}
 
-		// Test by fetching account info
-		$url = sprintf( 'https://api.getdrip.com/v2/%s/accounts', $account_id );
+		// Test by fetching user info - this endpoint validates credentials and returns user data.
+		$url = sprintf( 'https://api.getdrip.com/v2/%s/user', $account_id );
 
 		$response = wp_remote_get(
 			$url,
@@ -458,17 +458,18 @@ class GF_Drip extends GFFeedAddOn {
 
 		// Get both API Token and Account ID.
 		// The $value parameter contains the current field's value (saved value after save, or POST value during typing).
-		// We need to get the other field's value. Check POST first (for live validation while typing),
-		// then fall back to saved settings (for after save).
+		// For the other field, check POST first (for live validation while typing), then saved settings (for after save).
 		if ( 'api_token' === $field->name ) {
 			$api_token  = $value;
+			// Check POST first for live typing feedback, then saved settings.
 			$account_id = rgpost( '_gaddon_setting_account_id' );
 			if ( rgblank( $account_id ) ) {
 				$account_id = $this->get_plugin_setting( 'account_id' );
 			}
 		} else {
 			$account_id = $value;
-			$api_token  = rgpost( '_gaddon_setting_api_token' );
+			// Check POST first for live typing feedback, then saved settings.
+			$api_token = rgpost( '_gaddon_setting_api_token' );
 			if ( rgblank( $api_token ) ) {
 				$api_token = $this->get_plugin_setting( 'api_token' );
 			}
