@@ -12,12 +12,7 @@ if ( ! defined( 'WPINC' ) ) {
 	die;
 }
 
-// Only proceed if parent class exists - this check happens in main file before requiring.
-if ( ! class_exists( 'GFFeedAddOn' ) ) {
-	return;
-}
-
-// Include the Gravity Forms Feed Add-On Framework, mirroring the EmailOctopus add-on.
+// Ensure the Gravity Forms Feed Add-On Framework is loaded, mirroring other GF add-ons.
 GFForms::include_feed_addon_framework();
 
 /**
@@ -112,15 +107,6 @@ class GF_Drip extends GFFeedAddOn {
 	private static $_instance = null;
 
 	/**
-	 * Flag to indicate API initialization result.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @var bool|null
-	 */
-	protected $api_initialized = null;
-
-	/**
 	 * Get instance of this class
 	 *
 	 * @return GF_Drip
@@ -138,6 +124,9 @@ class GF_Drip extends GFFeedAddOn {
 	 */
 	public function init() {
 		parent::init();
+
+		// Add AJAX handlers
+		add_action( 'wp_ajax_gf_drip_test_connection', array( $this, 'ajax_test_connection' ) );
 	}
 
 	/**
@@ -148,59 +137,39 @@ class GF_Drip extends GFFeedAddOn {
 	public function plugin_settings_fields() {
 		return array(
 			array(
-				/* Translators: %s is the website address of Drip */
-				'description' => '<p>' . esc_html__( 'Drip is a powerful email marketing automation platform for growing businesses.', 'gravityforms-drip' ) . ' ' . sprintf( esc_html__( 'Go to %s to sign up.', 'gravityforms-drip' ), sprintf( '<a href="%s" target="_blank">%s</a>', 'https://www.getdrip.com', esc_html__( 'GetDrip.com', 'gravityforms-drip' ) ) ) . '</p>',
-				'fields'      => array(
+				'title'  => esc_html__( 'Drip API Settings', 'gravityforms-drip' ),
+				'fields' => array(
 					array(
 						'name'              => 'api_token',
-						'label'             => esc_html__( 'Drip API Token', 'gravityforms-drip' ),
+						'label'             => esc_html__( 'API Token', 'gravityforms-drip' ),
 						'type'              => 'text',
 						'class'             => 'medium',
 						'required'          => true,
-						'feedback_callback' => array( $this, 'initialize_api' ),
-						'tooltip'           => esc_html__( 'Enter your Drip API token, which can be retrieved from your Drip account under User Settings → API Token.', 'gravityforms-drip' ),
+						'feedback_callback' => array( $this, 'is_valid_api_token' ),
+						'description'       => sprintf(
+							/* translators: %s: Link to Drip API documentation */
+							esc_html__( 'Enter your Drip API token. You can find this in your Drip account under Settings > User Settings > API Token. %s', 'gravityforms-drip' ),
+							'<a href="https://www.getdrip.com/user/edit" target="_blank">' . esc_html__( 'Get your API token', 'gravityforms-drip' ) . '</a>'
+						),
 					),
 					array(
-						'name'     => 'account_id',
-						'label'    => esc_html__( 'Drip Account ID', 'gravityforms-drip' ),
-						'type'     => 'text',
-						'class'    => 'medium',
-						'required' => true,
-						'tooltip'  => esc_html__( 'Enter your Drip Account ID. You can find this in your Drip account URL (for example: https://www.getdrip.com/{account_id}/).', 'gravityforms-drip' ),
+						'name'              => 'account_id',
+						'label'             => esc_html__( 'Account ID', 'gravityforms-drip' ),
+						'type'              => 'text',
+						'class'             => 'medium',
+						'required'          => true,
+						'feedback_callback' => array( $this, 'is_valid_account_id' ),
+						'description'       => esc_html__( 'Enter your Drip Account ID. You can find this in your Drip account URL (e.g., https://www.getdrip.com/{account_id}/).', 'gravityforms-drip' ),
+					),
+					array(
+						'name'        => 'test_connection',
+						'type'        => 'test_connection',
+						'label'       => esc_html__( 'Test Connection', 'gravityforms-drip' ),
+						'description' => esc_html__( 'Click the button below to test your API connection.', 'gravityforms-drip' ),
 					),
 				),
 			),
 		);
-	}
-
-	/**
-	 * Initialize the Drip API connection for use by the add-on.
-	 *
-	 * Mirrors the EmailOctopus add-on pattern by validating credentials when
-	 * saving plugin settings and when feeds are created.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return bool|null True if valid, false if invalid, null if credentials missing.
-	 */
-	public function initialize_api() {
-		if ( null !== $this->api_initialized ) {
-			return $this->api_initialized;
-		}
-
-		$result = $this->test_api_connection();
-
-		if ( is_wp_error( $result ) ) {
-			$this->log_debug( __METHOD__ . '(): Drip API credentials could not be validated. ' . $result->get_error_message() );
-			$this->api_initialized = false;
-		} elseif ( true === $result ) {
-			$this->log_debug( __METHOD__ . '(): Drip API credentials are valid.' );
-			$this->api_initialized = true;
-		} else {
-			$this->api_initialized = null;
-		}
-
-		return $this->api_initialized;
 	}
 
 	/**
@@ -209,42 +178,81 @@ class GF_Drip extends GFFeedAddOn {
 	 * @return array
 	 */
 	public function feed_settings_fields() {
-		$base_settings = array(
+		$standard_fields = array(
 			array(
 				'name'     => 'feedName',
-				'label'    => esc_html__( 'Name', 'gravityforms-drip' ),
+				'label'    => esc_html__( 'Feed Name', 'gravityforms-drip' ),
 				'type'     => 'text',
 				'class'    => 'medium',
 				'required' => true,
-				'tooltip'  => sprintf(
-					'<h6>%s</h6>%s',
-					esc_html__( 'Name', 'gravityforms-drip' ),
-					esc_html__( 'Enter a feed name to uniquely identify this setup.', 'gravityforms-drip' )
-				),
+				'tooltip'  => '<h6>' . esc_html__( 'Feed Name', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Enter a name for this feed. This will help you identify it later.', 'gravityforms-drip' ),
+			),
+			array(
+				'name'     => 'email',
+				'label'    => esc_html__( 'Email Address', 'gravityforms-drip' ),
+				'type'     => 'field_select',
+				'required' => true,
+				'tooltip'  => '<h6>' . esc_html__( 'Email Address', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Select the form field that contains the email address. This field is required.', 'gravityforms-drip' ),
 			),
 		);
 
-		$field_mapping = array(
+		$standard_drip_fields = array(
 			array(
-				'name'      => 'mappedFields',
-				'label'     => esc_html__( 'Map Fields', 'gravityforms-drip' ),
-				'type'      => 'field_map',
-				'field_map' => $this->merge_vars_field_map(),
-				'tooltip'   => sprintf(
-					'<h6>%s</h6>%s',
-					esc_html__( 'Map Fields', 'gravityforms-drip' ),
-					esc_html__( 'Associate your Drip subscriber fields to the appropriate Gravity Forms fields by selecting the appropriate form field from the list.', 'gravityforms-drip' )
-				),
+				'name'     => 'first_name',
+				'label'    => esc_html__( 'First Name', 'gravityforms-drip' ),
+				'type'     => 'field_select',
+				'required' => false,
 			),
+			array(
+				'name'     => 'last_name',
+				'label'    => esc_html__( 'Last Name', 'gravityforms-drip' ),
+				'type'     => 'field_select',
+				'required' => false,
+			),
+			array(
+				'name'     => 'phone',
+				'label'    => esc_html__( 'Phone', 'gravityforms-drip' ),
+				'type'     => 'field_select',
+				'required' => false,
+			),
+			array(
+				'name'     => 'address',
+				'label'    => esc_html__( 'Address', 'gravityforms-drip' ),
+				'type'     => 'field_select',
+				'required' => false,
+			),
+			array(
+				'name'     => 'city',
+				'label'    => esc_html__( 'City', 'gravityforms-drip' ),
+				'type'     => 'field_select',
+				'required' => false,
+			),
+			array(
+				'name'     => 'state',
+				'label'    => esc_html__( 'State', 'gravityforms-drip' ),
+				'type'     => 'field_select',
+				'required' => false,
+			),
+			array(
+				'name'     => 'zip',
+				'label'    => esc_html__( 'ZIP Code', 'gravityforms-drip' ),
+				'type'     => 'field_select',
+				'required' => false,
+			),
+			array(
+				'name'     => 'country',
+				'label'    => esc_html__( 'Country', 'gravityforms-drip' ),
+				'type'     => 'field_select',
+				'required' => false,
+			),
+		);
+
+		$custom_fields = array(
 			array(
 				'name'  => 'custom_fields',
 				'label' => esc_html__( 'Custom Fields', 'gravityforms-drip' ),
 				'type'  => 'dynamic_field_map',
-				'tooltip' => sprintf(
-					'<h6>%s</h6>%s',
-					esc_html__( 'Custom Fields', 'gravityforms-drip' ),
-					esc_html__( 'Map form fields to Drip custom fields. The left column shows the Drip custom field name, and the right column allows you to select the form field to map to it.', 'gravityforms-drip' )
-				),
+				'tooltip' => '<h6>' . esc_html__( 'Custom Fields', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Map form fields to Drip custom fields. The left column shows the Drip custom field name, and the right column allows you to select the form field to map to it.', 'gravityforms-drip' ),
 			),
 		);
 
@@ -254,11 +262,7 @@ class GF_Drip extends GFFeedAddOn {
 				'label'   => esc_html__( 'Tags', 'gravityforms-drip' ),
 				'type'    => 'text',
 				'class'   => 'large',
-				'tooltip' => sprintf(
-					'<h6>%s</h6>%s',
-					esc_html__( 'Tags', 'gravityforms-drip' ),
-					esc_html__( 'Enter tags separated by commas. These tags will be applied to the subscriber in Drip.', 'gravityforms-drip' )
-				),
+				'tooltip' => '<h6>' . esc_html__( 'Tags', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Enter tags separated by commas. These tags will be applied to the subscriber in Drip.', 'gravityforms-drip' ),
 			),
 			array(
 				'name'    => 'double_optin',
@@ -270,118 +274,34 @@ class GF_Drip extends GFFeedAddOn {
 						'name'  => 'double_optin',
 					),
 				),
-				'tooltip' => sprintf(
-					'<h6>%s</h6>%s',
-					esc_html__( 'Double Opt-In', 'gravityforms-drip' ),
-					esc_html__( 'If enabled, subscribers will receive a confirmation email before being added to Drip.', 'gravityforms-drip' )
-				),
+				'tooltip' => '<h6>' . esc_html__( 'Double Opt-In', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'If enabled, subscribers will receive a confirmation email before being added to Drip.', 'gravityforms-drip' ),
 			),
 			array(
 				'name'    => 'feed_condition',
 				'label'   => esc_html__( 'Conditional Logic', 'gravityforms-drip' ),
 				'type'    => 'feed_condition',
-				'tooltip' => sprintf(
-					'<h6>%s</h6>%s',
-					esc_html__( 'Conditional Logic', 'gravityforms-drip' ),
-					esc_html__( 'When conditional logic is enabled, form submissions will only be sent to Drip when the conditions are met. When disabled, all form submissions will be sent to Drip.', 'gravityforms-drip' )
-				),
+				'tooltip' => '<h6>' . esc_html__( 'Conditional Logic', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'When conditional logic is enabled, form submissions will only be sent to Drip when the conditions are met. When disabled, all form submissions will be sent to Drip.', 'gravityforms-drip' ),
 			),
 		);
 
 		return array(
 			array(
-				'fields' => $base_settings,
+				'title'  => esc_html__( 'Feed Settings', 'gravityforms-drip' ),
+				'fields' => $standard_fields,
 			),
 			array(
-				'fields' => $field_mapping,
+				'title'  => esc_html__( 'Standard Drip Fields', 'gravityforms-drip' ),
+				'fields' => $standard_drip_fields,
 			),
 			array(
+				'title'  => esc_html__( 'Custom Fields', 'gravityforms-drip' ),
+				'fields' => $custom_fields,
+			),
+			array(
+				'title'  => esc_html__( 'Additional Settings', 'gravityforms-drip' ),
 				'fields' => $additional_settings,
 			),
 		);
-	}
-
-	/**
-	 * Form settings page title.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return string
-	 */
-	public function feed_settings_title() {
-		return esc_html__( 'Feed Settings', 'gravityforms-drip' );
-	}
-
-	/**
-	 * Return the plugin's icon for the plugin/form settings menu.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return string
-	 */
-	public function get_menu_icon() {
-		$icon_path = GF_DRIP_PLUGIN_DIR . 'images/menu-icon.svg';
-
-		if ( file_exists( $icon_path ) ) {
-			return file_get_contents( $icon_path );
-		}
-
-		return '';
-	}
-
-	/**
-	 * Define the Drip field map used by the feed settings.
-	 *
-	 * This mirrors the EmailOctopus add-on approach of allowing admins to map
-	 * provider fields to Gravity Forms fields in a single "Map Fields" control.
-	 *
-	 * @since 1.0.0
-	 *
-	 * @return array
-	 */
-	public function merge_vars_field_map() {
-		$field_map = array(
-			'email'      => array(
-				'name'       => 'email',
-				'label'      => esc_html__( 'Email Address', 'gravityforms-drip' ),
-				'required'   => true,
-				'field_type' => array( 'email', 'hidden' ),
-			),
-			'first_name' => array(
-				'name'  => 'first_name',
-				'label' => esc_html__( 'First Name', 'gravityforms-drip' ),
-			),
-			'last_name'  => array(
-				'name'  => 'last_name',
-				'label' => esc_html__( 'Last Name', 'gravityforms-drip' ),
-			),
-			'phone'      => array(
-				'name'  => 'phone',
-				'label' => esc_html__( 'Phone', 'gravityforms-drip' ),
-			),
-			'address'    => array(
-				'name'  => 'address',
-				'label' => esc_html__( 'Address', 'gravityforms-drip' ),
-			),
-			'city'       => array(
-				'name'  => 'city',
-				'label' => esc_html__( 'City', 'gravityforms-drip' ),
-			),
-			'state'      => array(
-				'name'  => 'state',
-				'label' => esc_html__( 'State', 'gravityforms-drip' ),
-			),
-			'zip'        => array(
-				'name'  => 'zip',
-				'label' => esc_html__( 'ZIP Code', 'gravityforms-drip' ),
-			),
-			'country'    => array(
-				'name'  => 'country',
-				'label' => esc_html__( 'Country', 'gravityforms-drip' ),
-			),
-		);
-
-		return $field_map;
 	}
 
 	/**
@@ -555,20 +475,14 @@ class GF_Drip extends GFFeedAddOn {
 	 * @return void
 	 */
 	public function process_feed( $feed, $entry, $form ) {
-		// Check if feed conditions are met.
+		// Check if feed conditions are met
 		if ( ! $this->is_feed_condition_met( $feed, $form, $entry ) ) {
 			$this->log_debug( 'Feed condition not met. Skipping feed processing.' );
 			return;
 		}
 
-		// Ensure API is initialized and credentials are valid.
-		if ( ! $this->initialize_api() ) {
-			$this->log_error( 'Drip API could not be initialized. Please check your plugin settings.' );
-			return;
-		}
-
-		// Get API credentials.
-		$api_token  = $this->get_plugin_setting( 'api_token' );
+		// Get API credentials
+		$api_token = $this->get_plugin_setting( 'api_token' );
 		$account_id = $this->get_plugin_setting( 'account_id' );
 
 		if ( empty( $api_token ) || empty( $account_id ) ) {
@@ -576,22 +490,14 @@ class GF_Drip extends GFFeedAddOn {
 			return;
 		}
 
-		// Get mapped fields from the field map (Email and optional profile fields).
-		$field_map = $this->get_field_map_fields( $feed, 'mappedFields' );
-
-		// Back-compat: fall back to legacy meta structure if field map is not present.
-		if ( empty( $field_map ) ) {
-			$email_field_id = rgars( $feed, 'meta/email' );
-		} else {
-			$email_field_id = isset( $field_map['email'] ) ? $field_map['email'] : '';
-		}
-
+		// Get email field
+		$email_field_id = rgars( $feed, 'meta/email' );
 		if ( empty( $email_field_id ) ) {
 			$this->log_error( 'Email field is not mapped in feed.' );
 			return;
 		}
 
-		$email = $this->get_field_value( $form, $entry, $email_field_id );
+		$email = rgar( $entry, $email_field_id );
 		if ( empty( $email ) || ! is_email( $email ) ) {
 			$this->log_error( 'Invalid email address: ' . $email );
 			return;
@@ -606,12 +512,12 @@ class GF_Drip extends GFFeedAddOn {
 			),
 		);
 
-		// Map standard fields using the field map for a layout consistent with other add-ons.
+		// Map standard fields
 		$standard_fields = array( 'first_name', 'last_name', 'phone', 'address', 'city', 'state', 'zip', 'country' );
 		foreach ( $standard_fields as $field_name ) {
-			$field_id = isset( $field_map[ $field_name ] ) ? $field_map[ $field_name ] : rgars( $feed, 'meta/' . $field_name );
+			$field_id = rgars( $feed, 'meta/' . $field_name );
 			if ( ! empty( $field_id ) ) {
-				$field_value = $this->get_field_value( $form, $entry, $field_id );
+				$field_value = rgar( $entry, $field_id );
 				if ( ! empty( $field_value ) ) {
 					$subscriber_data['subscribers'][0][ $field_name ] = sanitize_text_field( $field_value );
 				}
