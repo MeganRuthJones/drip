@@ -8,14 +8,12 @@
  */
 
 // If this file is called directly, abort.
-if ( ! defined( 'WPINC' ) ) {
+if ( ! defined( 'ABSPATH' ) ) {
 	die;
 }
 
-// Only proceed if parent class exists - this check happens in main file before requiring
-if ( ! class_exists( 'GFFeedAddOn' ) ) {
-	return;
-}
+// Include the Gravity Forms Feed Add-On Framework, mirroring official add-ons like EmailOctopus.
+GFForms::include_feed_addon_framework();
 
 /**
  * Main add-on class
