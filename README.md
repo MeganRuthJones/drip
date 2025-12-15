@@ -2,7 +2,6 @@
 
 A WordPress plugin that integrates Gravity Forms with the Drip email marketing platform, allowing you to automatically add form submissions as subscribers to your Drip account.
 
-
 ## Features
 
 - **Easy Integration**: Seamlessly connect Gravity Forms with Drip using the official Drip API
@@ -112,13 +111,6 @@ GPL-2.0+
 
 ## Changelog
 
-### 1.0.1
-- Fixed critical error: GFFeedAddOn class not found
-- Improved class loading with wp_loaded hook for better compatibility
-- Added proper class existence checks before requiring files
-- Fixed capability settings to use standard Gravity Forms capabilities
-- Enhanced error handling and safety checks
-
 ### 1.0.0
 - Initial release
 - Basic integration with Drip API
@@ -126,5 +118,4 @@ GPL-2.0+
 - Conditional logic support
 - Tag support
 - Double opt-in support
-
 
