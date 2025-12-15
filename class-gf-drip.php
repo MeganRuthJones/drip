@@ -410,6 +410,24 @@ class GF_Drip extends GFFeedAddOn {
 	}
 
 	/**
+	 * Clear the API initialization cache when settings are updated.
+	 *
+	 * This ensures the feedback callback uses fresh values after saving.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array $settings The settings being saved.
+	 *
+	 * @return void
+	 */
+	public function update_plugin_settings( $settings ) {
+		// Clear the cached API initialization result so feedback callbacks use fresh values.
+		$this->api_initialized = null;
+
+		parent::update_plugin_settings( $settings );
+	}
+
+	/**
 	 * Feedback callback for API Token and Account ID in plugin settings.
 	 *
 	 * Mirrors the Kit (ConvertKit) add-on: validates the currently entered
@@ -432,16 +450,20 @@ class GF_Drip extends GFFeedAddOn {
 			return null;
 		}
 
-		// Determine both values: check POST first (for live typing), then fall back to saved settings (for after save).
+		// Get both API Token and Account ID.
+		// The $value parameter contains the current field's value (either from POST during typing, or saved after save).
+		// We need to get the other field's value from POST (if submitting) or saved settings (if viewing after save).
 		if ( 'api_token' === $field->name ) {
 			$api_token  = $value;
+			// Try POST first (for live validation while typing), then saved settings (for after save).
 			$account_id = rgpost( '_gaddon_setting_account_id' );
 			if ( rgblank( $account_id ) ) {
 				$account_id = $this->get_plugin_setting( 'account_id' );
 			}
 		} else {
 			$account_id = $value;
-			$api_token  = rgpost( '_gaddon_setting_api_token' );
+			// Try POST first (for live validation while typing), then saved settings (for after save).
+			$api_token = rgpost( '_gaddon_setting_api_token' );
 			if ( rgblank( $api_token ) ) {
 				$api_token = $this->get_plugin_setting( 'api_token' );
 			}
@@ -452,8 +474,10 @@ class GF_Drip extends GFFeedAddOn {
 			return null;
 		}
 
+		// Test the API connection with these credentials.
 		$result = $this->test_api_connection( $api_token, $account_id );
 
+		// Return true for success (green tick), false for failure (red X), null for no icon.
 		if ( is_wp_error( $result ) ) {
 			// Log the error so it appears in Gravity Forms logs.
 			$this->log_error( __METHOD__ . '(): Drip API validation failed. ' . $result->get_error_message() );
@@ -461,6 +485,7 @@ class GF_Drip extends GFFeedAddOn {
 			return false;
 		}
 
+		// Success - log and return true for green tick.
 		$this->log_debug( __METHOD__ . '(): Drip API credentials are valid.' );
 
 		return true;
