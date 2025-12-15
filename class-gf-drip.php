@@ -331,8 +331,8 @@ class GF_Drip extends GFFeedAddOn {
 			return new WP_Error( 'missing_credentials', esc_html__( 'API token and Account ID are required.', 'gravityforms-drip' ) );
 		}
 
-		// Test by fetching account info
-		$url = sprintf( 'https://api.getdrip.com/v2/%s/accounts', $account_id );
+		// Test by fetching user info - this endpoint validates credentials and returns user data.
+		$url = sprintf( 'https://api.getdrip.com/v2/%s/user', $account_id );
 
 		$response = wp_remote_get(
 			$url,
@@ -354,6 +354,9 @@ class GF_Drip extends GFFeedAddOn {
 		$response_code = wp_remote_retrieve_response_code( $response );
 		$response_body = wp_remote_retrieve_body( $response );
 
+		// Log the response for debugging.
+		$this->log_debug( __METHOD__ . '(): Drip API response code: ' . $response_code );
+
 		if ( 200 !== $response_code ) {
 			$error_data    = json_decode( $response_body, true );
 			$error_message = isset( $error_data['errors'][0]['message'] ) ? $error_data['errors'][0]['message'] : '';
@@ -363,10 +366,13 @@ class GF_Drip extends GFFeedAddOn {
 				$error_message = esc_html__( 'Unable to verify your Drip API credentials. Please check your token and Account ID, save your settings, and try again.', 'gravityforms-drip' );
 			}
 
-			$this->log_error( 'API connection test failed: HTTP ' . $response_code . ' - ' . $error_message );
+			$this->log_error( __METHOD__ . '(): API connection test failed: HTTP ' . $response_code . ' - ' . $error_message );
 
 			return new WP_Error( 'invalid_credentials', $error_message );
 		}
+
+		// Success - log for debugging.
+		$this->log_debug( __METHOD__ . '(): Drip API connection test successful.' );
 
 		return true;
 	}
@@ -451,18 +457,18 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		// Get both API Token and Account ID.
-		// The $value parameter contains the current field's value (either from POST during typing, or saved after save).
-		// We need to get the other field's value from POST (if submitting) or saved settings (if viewing after save).
+		// The $value parameter contains the current field's value (saved value after save, or POST value during typing).
+		// For the other field, check POST first (for live validation while typing), then saved settings (for after save).
 		if ( 'api_token' === $field->name ) {
 			$api_token  = $value;
-			// Try POST first (for live validation while typing), then saved settings (for after save).
+			// Check POST first for live typing feedback, then saved settings.
 			$account_id = rgpost( '_gaddon_setting_account_id' );
 			if ( rgblank( $account_id ) ) {
 				$account_id = $this->get_plugin_setting( 'account_id' );
 			}
 		} else {
 			$account_id = $value;
-			// Try POST first (for live validation while typing), then saved settings (for after save).
+			// Check POST first for live typing feedback, then saved settings.
 			$api_token = rgpost( '_gaddon_setting_api_token' );
 			if ( rgblank( $api_token ) ) {
 				$api_token = $this->get_plugin_setting( 'api_token' );
@@ -474,19 +480,23 @@ class GF_Drip extends GFFeedAddOn {
 			return null;
 		}
 
+		// Sanitize values before testing.
+		$api_token  = sanitize_text_field( $api_token );
+		$account_id = sanitize_text_field( $account_id );
+
 		// Test the API connection with these credentials.
 		$result = $this->test_api_connection( $api_token, $account_id );
 
-		// Return true for success (green tick), false for failure (red X), null for no icon.
+		// Return true for success (green tick), false for failure (red X).
 		if ( is_wp_error( $result ) ) {
 			// Log the error so it appears in Gravity Forms logs.
-			$this->log_error( __METHOD__ . '(): Drip API validation failed. ' . $result->get_error_message() );
+			$this->log_error( __METHOD__ . '(): Drip API validation failed for field ' . $field->name . '. ' . $result->get_error_message() );
 
 			return false;
 		}
 
 		// Success - log and return true for green tick.
-		$this->log_debug( __METHOD__ . '(): Drip API credentials are valid.' );
+		$this->log_debug( __METHOD__ . '(): Drip API credentials are valid for field ' . $field->name . '.' );
 
 		return true;
 	}
