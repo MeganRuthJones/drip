@@ -154,8 +154,8 @@ class GF_Drip extends GFFeedAddOn {
 						'type'              => 'text',
 						'class'             => 'medium',
 						'required'          => true,
-						// Use API validation for feedback, mirroring the EmailOctopus add-on.
-						'feedback_callback' => array( $this, 'initialize_api' ),
+						// Use live validation for feedback, mirroring the Kit add-on behaviour.
+						'feedback_callback' => array( $this, 'plugin_settings_fields_feedback_callback' ),
 						'description'       => sprintf(
 							/* translators: %s: Link to Drip API documentation */
 							esc_html__( 'Enter your Drip API token. You can find this in your Drip account under Settings > User Settings > API Token. %s', 'gravityforms-drip' ),
@@ -169,6 +169,8 @@ class GF_Drip extends GFFeedAddOn {
 						'class'       => 'medium',
 						'required'    => true,
 						'description' => esc_html__( 'Enter your Drip Account ID. You can find this in your Drip account URL (e.g., https://www.getdrip.com/{account_id}/).', 'gravityforms-drip' ),
+						// Use the same feedback callback so both fields get ticks/crosses.
+						'feedback_callback' => array( $this, 'plugin_settings_fields_feedback_callback' ),
 					),
 					array(
 						'name'        => 'test_connection',
@@ -468,16 +470,14 @@ class GF_Drip extends GFFeedAddOn {
 	}
 
 	/**
-	 * Initialize the Drip API / validate credentials for settings feedback.
+	 * Initialize the Drip API using saved credentials.
 	 *
-	 * Mirrors the EmailOctopus add-on: this is used as the feedback_callback
-	 * for the API Token field and only checks against the saved settings.
-	 * Returning null when credentials are missing prevents an error icon
-	 * showing before the user has entered anything.
+	 * This is used by the add-on framework (not the settings field feedback)
+	 * to determine if the API is ready for use on feed and form settings pages.
 	 *
 	 * @since 1.0.0
 	 *
-	 * @return bool|null True if valid, false if invalid, null if not ready.
+	 * @return bool True if initialized and valid, false otherwise.
 	 */
 	public function initialize_api() {
 		if ( null !== $this->api_initialized ) {
@@ -487,9 +487,11 @@ class GF_Drip extends GFFeedAddOn {
 		$api_token  = $this->get_plugin_setting( 'api_token' );
 		$account_id = $this->get_plugin_setting( 'account_id' );
 
+		// Require both values to be present before we try to initialize.
 		if ( rgblank( $api_token ) || rgblank( $account_id ) ) {
-			// No credentials saved yet – don't show a red X.
-			return null;
+			$this->api_initialized = false;
+
+			return false;
 		}
 
 		$result = $this->test_api_connection( $api_token, $account_id );
@@ -503,6 +505,43 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		return $this->api_initialized;
+	}
+
+	/**
+	 * Feedback callback for API Token and Account ID in plugin settings.
+	 *
+	 * Mirrors the Kit (ConvertKit) add-on: validates the currently entered
+	 * values (not just the saved ones) so the tick/cross reflects what the
+	 * user has typed before they save.
+	 *
+	 * Returning null when either field is empty prevents any icon being shown.
+	 *
+	 * @since 1.0.0
+	 *
+     * @param string                                        $value The value of the field being validated.
+     * @param \Gravity_Forms\Gravity_Forms\Settings\Fields\Text $field  The field object being validated.
+	 *
+	 * @return bool|null True if valid, false if invalid, null if not enough data.
+	 */
+	public function plugin_settings_fields_feedback_callback( $value, $field ) {
+
+		// If the current field is empty, do not show any icon yet.
+		if ( empty( $value ) ) {
+			return null;
+		}
+
+		// Determine both values based on which field is being validated.
+		$api_token  = ( 'api_token' === $field->name ) ? $value : rgpost( '_gaddon_setting_api_token' );
+		$account_id = ( 'account_id' === $field->name ) ? $value : rgpost( '_gaddon_setting_account_id' );
+
+		// If we still don't have both values, don't show an icon yet.
+		if ( rgblank( $api_token ) || rgblank( $account_id ) ) {
+			return null;
+		}
+
+		$result = $this->test_api_connection( $api_token, $account_id );
+
+		return ! is_wp_error( $result );
 	}
 
 	/**
@@ -695,8 +734,8 @@ class GF_Drip extends GFFeedAddOn {
 	/**
 	 * Configure which columns should be displayed on the feed list page.
 	 *
-	 * Mirrors the EmailOctopus style by showing the feed name plus an
-	 * additional Drip-specific column so the list is more informative.
+	 * Mirrors the Kit add-on by showing the feed name plus a second column
+	 * which gives additional context.
 	 *
 	 * @since 1.0.0
 	 *
@@ -704,8 +743,8 @@ class GF_Drip extends GFFeedAddOn {
 	 */
 	public function feed_list_columns() {
 		return array(
-			'feedName'       => esc_html__( 'Name', 'gravityforms-drip' ),
-			'drip_account'   => esc_html__( 'Drip Account', 'gravityforms-drip' ),
+			'feed_name' => esc_html__( 'Name', 'gravityforms-drip' ),
+			'form_id'   => esc_html__( 'Form', 'gravityforms-drip' ),
 		);
 	}
 
@@ -721,7 +760,7 @@ class GF_Drip extends GFFeedAddOn {
 	 *
 	 * @return string
 	 */
-	public function get_column_value_feedName( $feed ) {
+	public function get_column_value_feed_name( $feed ) {
 		$name = rgar( $feed['meta'], 'feedName' );
 
 		if ( empty( $name ) ) {
@@ -736,10 +775,10 @@ class GF_Drip extends GFFeedAddOn {
 	}
 
 	/**
-	 * Returns the value for the Drip Account column.
+	 * Returns the value for the Form column.
 	 *
-	 * For now this is the configured Account ID, giving a quick visual check
-	 * similar to how EmailOctopus shows the selected list.
+	 * Mirrors the Kit add-on by displaying contextual information for each feed.
+	 * Here we display the associated Gravity Form title.
 	 *
 	 * @since 1.0.0
 	 *
@@ -747,9 +786,15 @@ class GF_Drip extends GFFeedAddOn {
 	 *
 	 * @return string
 	 */
-	public function get_column_value_drip_account( $feed ) {
-		$account_id = $this->get_plugin_setting( 'account_id' );
+	public function get_column_value_form_id( $feed ) {
+		$form_id = rgar( $feed, 'form_id' );
 
-		return ! empty( $account_id ) ? esc_html( $account_id ) : '';
+		if ( empty( $form_id ) ) {
+			return '';
+		}
+
+		$form = GFAPI::get_form( $form_id );
+
+		return is_wp_error( $form ) || empty( $form ) ? '' : esc_html( rgar( $form, 'title' ) );
 	}
 }
