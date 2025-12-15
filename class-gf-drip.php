@@ -23,14 +23,14 @@ GFForms::include_feed_addon_framework();
 class GF_Drip extends GFFeedAddOn {
 
 	/**
-	 * Plugin version
+	 * Plugin version.
 	 *
 	 * @var string
 	 */
 	protected $_version = GF_DRIP_VERSION;
 
 	/**
-	 * Minimum Gravity Forms version required
+	 * Minimum Gravity Forms version required.
 	 *
 	 * @var string
 	 */
@@ -107,6 +107,15 @@ class GF_Drip extends GFFeedAddOn {
 	private static $_instance = null;
 
 	/**
+	 * Cached result of the last API initialization attempt.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @var bool|null True if valid, false if invalid, null if not yet checked.
+	 */
+	protected $api_initialized = null;
+
+	/**
 	 * Get instance of this class
 	 *
 	 * @return GF_Drip
@@ -145,8 +154,8 @@ class GF_Drip extends GFFeedAddOn {
 						'type'              => 'text',
 						'class'             => 'medium',
 						'required'          => true,
-						// Use live API validation for feedback, similar to EmailOctopus.
-						'feedback_callback' => array( $this, 'validate_api_credentials' ),
+						// Use API validation for feedback, mirroring the EmailOctopus add-on.
+						'feedback_callback' => array( $this, 'initialize_api' ),
 						'description'       => sprintf(
 							/* translators: %s: Link to Drip API documentation */
 							esc_html__( 'Enter your Drip API token. You can find this in your Drip account under Settings > User Settings > API Token. %s', 'gravityforms-drip' ),
@@ -401,6 +410,7 @@ class GF_Drip extends GFFeedAddOn {
 	 * @return bool|WP_Error True on success, WP_Error on failure
 	 */
 	public function test_api_connection( $api_token = '', $account_id = '' ) {
+		// Fall back to saved settings if explicit values not provided.
 		if ( empty( $api_token ) ) {
 			$api_token = $this->get_plugin_setting( 'api_token' );
 		}
@@ -408,6 +418,10 @@ class GF_Drip extends GFFeedAddOn {
 		if ( empty( $account_id ) ) {
 			$account_id = $this->get_plugin_setting( 'account_id' );
 		}
+
+		// Sanitize and trim to avoid subtle issues with copy/pasted spaces.
+		$api_token  = sanitize_text_field( $api_token );
+		$account_id = sanitize_text_field( $account_id );
 
 		if ( empty( $api_token ) || empty( $account_id ) ) {
 			return new WP_Error( 'missing_credentials', esc_html__( 'API token and Account ID are required.', 'gravityforms-drip' ) );
@@ -454,51 +468,41 @@ class GF_Drip extends GFFeedAddOn {
 	}
 
 	/**
-	 * Check if API token is valid
+	 * Initialize the Drip API / validate credentials for settings feedback.
 	 *
-	 * @param string $value API token value
-	 * @return bool
+	 * Mirrors the EmailOctopus add-on: this is used as the feedback_callback
+	 * for the API Token field and only checks against the saved settings.
+	 * Returning null when credentials are missing prevents an error icon
+	 * showing before the user has entered anything.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return bool|null True if valid, false if invalid, null if not ready.
 	 */
-	public function is_valid_api_token( $value ) {
-		return ! empty( $value ) && strlen( $value ) > 10;
-	}
-
-	/**
-	 * Validate API credentials against the Drip API for settings feedback.
-	 *
-	 * This is used as the feedback_callback for the API Token field so that
-	 * the UI only shows a success icon when the provided token (and current
-	 * Account ID value) are actually accepted by Drip, similar to EmailOctopus.
-	 *
-	 * @param string $api_token API token value from the settings field.
-	 *
-	 * @return bool True if credentials are valid, false otherwise.
-	 */
-	public function validate_api_credentials( $api_token ) {
-		// Get the account ID from the posted settings (unsaved) or fall back to saved settings.
-		$account_id = rgpost( '_gaddon_setting_account_id' );
-		if ( empty( $account_id ) ) {
-			$account_id = $this->get_plugin_setting( 'account_id' );
+	public function initialize_api() {
+		if ( null !== $this->api_initialized ) {
+			return $this->api_initialized;
 		}
 
-		// If either value is missing, we can't validate yet.
-		if ( empty( $api_token ) || empty( $account_id ) ) {
-			return false;
+		$api_token  = $this->get_plugin_setting( 'api_token' );
+		$account_id = $this->get_plugin_setting( 'account_id' );
+
+		if ( rgblank( $api_token ) || rgblank( $account_id ) ) {
+			// No credentials saved yet – don't show a red X.
+			return null;
 		}
 
 		$result = $this->test_api_connection( $api_token, $account_id );
 
-		return ! is_wp_error( $result );
-	}
+		if ( is_wp_error( $result ) ) {
+			$this->log_debug( __METHOD__ . '(): Drip API credentials could not be validated. ' . $result->get_error_message() );
+			$this->api_initialized = false;
+		} else {
+			$this->log_debug( __METHOD__ . '(): Drip API credentials are valid.' );
+			$this->api_initialized = true;
+		}
 
-	/**
-	 * Check if Account ID is valid
-	 *
-	 * @param string $value Account ID value
-	 * @return bool
-	 */
-	public function is_valid_account_id( $value ) {
-		return ! empty( $value );
+		return $this->api_initialized;
 	}
 
 	/**
@@ -691,8 +695,8 @@ class GF_Drip extends GFFeedAddOn {
 	/**
 	 * Configure which columns should be displayed on the feed list page.
 	 *
-	 * This mirrors the default behaviour but allows us to ensure a visible name
-	 * for older feeds which may not have the feedName meta populated.
+	 * Mirrors the EmailOctopus style by showing the feed name plus an
+	 * additional Drip-specific column so the list is more informative.
 	 *
 	 * @since 1.0.0
 	 *
@@ -700,7 +704,8 @@ class GF_Drip extends GFFeedAddOn {
 	 */
 	public function feed_list_columns() {
 		return array(
-			'feedName' => esc_html__( 'Name', 'gravityforms-drip' ),
+			'feedName'       => esc_html__( 'Name', 'gravityforms-drip' ),
+			'drip_account'   => esc_html__( 'Drip Account', 'gravityforms-drip' ),
 		);
 	}
 
@@ -728,5 +733,23 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		return $name;
+	}
+
+	/**
+	 * Returns the value for the Drip Account column.
+	 *
+	 * For now this is the configured Account ID, giving a quick visual check
+	 * similar to how EmailOctopus shows the selected list.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array $feed The feed being included in the feed list.
+	 *
+	 * @return string
+	 */
+	public function get_column_value_drip_account( $feed ) {
+		$account_id = $this->get_plugin_setting( 'account_id' );
+
+		return ! empty( $account_id ) ? esc_html( $account_id ) : '';
 	}
 }
