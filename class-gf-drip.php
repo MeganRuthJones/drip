@@ -133,9 +133,6 @@ class GF_Drip extends GFFeedAddOn {
 	 */
 	public function init() {
 		parent::init();
-
-		// Add AJAX handlers
-		add_action( 'wp_ajax_gf_drip_test_connection', array( $this, 'ajax_test_connection' ) );
 	}
 
 	/**
@@ -163,20 +160,14 @@ class GF_Drip extends GFFeedAddOn {
 						),
 					),
 					array(
-						'name'        => 'account_id',
-						'label'       => esc_html__( 'Account ID', 'gravityforms-drip' ),
-						'type'        => 'text',
-						'class'       => 'medium',
-						'required'    => true,
-						'description' => esc_html__( 'Enter your Drip Account ID. You can find this in your Drip account URL (e.g., https://www.getdrip.com/{account_id}/).', 'gravityforms-drip' ),
+						'name'              => 'account_id',
+						'label'             => esc_html__( 'Account ID', 'gravityforms-drip' ),
+						'type'              => 'text',
+						'class'             => 'medium',
+						'required'          => true,
+						'description'       => esc_html__( 'Enter your Drip Account ID. You can find this in your Drip account URL (e.g., https://www.getdrip.com/{account_id}/).', 'gravityforms-drip' ),
 						// Use the same feedback callback so both fields get ticks/crosses.
 						'feedback_callback' => array( $this, 'plugin_settings_fields_feedback_callback' ),
-					),
-					array(
-						'name'        => 'test_connection',
-						'type'        => 'test_connection',
-						'label'       => esc_html__( 'Test Connection', 'gravityforms-drip' ),
-						'description' => esc_html__( 'Click the button below to test your API connection.', 'gravityforms-drip' ),
 					),
 				),
 			),
@@ -316,95 +307,6 @@ class GF_Drip extends GFFeedAddOn {
 	}
 
 	/**
-	 * Render test connection field
-	 *
-	 * @param array $field Field configuration
-	 * @param bool  $echo  Whether to echo the output
-	 * @return string
-	 */
-	public function settings_test_connection( $field, $echo = true ) {
-		$html = sprintf(
-			'<button type="button" id="gf_drip_test_connection" class="button button-secondary">%s</button>',
-			esc_html__( 'Test Connection', 'gravityforms-drip' )
-		);
-
-		$html .= '<div id="gf_drip_test_result" style="margin-top: 10px;"></div>';
-
-		// Add JavaScript for AJAX test
-		$html .= '<script type="text/javascript">
-			jQuery(document).ready(function($) {
-				$("#gf_drip_test_connection").on("click", function() {
-					var $button = $(this);
-					var $result = $("#gf_drip_test_result");
-					
-					$button.prop("disabled", true).text("' . esc_js( __( 'Testing...', 'gravityforms-drip' ) ) . '");
-					$result.html("");
-					
-					$.ajax({
-						url: ajaxurl,
-						type: "POST",
-						data: {
-							action: "gf_drip_test_connection",
-							api_token: $("#api_token").val(),
-							account_id: $("#account_id").val(),
-							nonce: "' . wp_create_nonce( 'gf_drip_test_connection' ) . '"
-						},
-						success: function(response) {
-							if (response.success) {
-								$result.html("<div class=\'notice notice-success inline\'><p>" + response.data.message + "</p></div>");
-							} else {
-								$result.html("<div class=\'notice notice-error inline\'><p>" + response.data.message + "</p></div>");
-							}
-						},
-						error: function() {
-							$result.html("<div class=\'notice notice-error inline\'><p>' . esc_js( __( 'An error occurred while testing the connection.', 'gravityforms-drip' ) ) . '</p></div>");
-						},
-						complete: function() {
-							$button.prop("disabled", false).text("' . esc_js( __( 'Test Connection', 'gravityforms-drip' ) ) . '");
-						}
-					});
-				});
-			});
-		</script>';
-
-		if ( $echo ) {
-			echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-		}
-
-		return $html;
-	}
-
-	/**
-	 * AJAX handler for testing connection
-	 */
-	public function ajax_test_connection() {
-		// Verify nonce
-		if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'gf_drip_test_connection' ) ) {
-			wp_send_json_error( array( 'message' => esc_html__( 'Security check failed.', 'gravityforms-drip' ) ) );
-		}
-
-		// Check permissions
-		if ( ! $this->current_user_can_any( $this->_capabilities_settings_page ) ) {
-			wp_send_json_error( array( 'message' => esc_html__( 'You do not have permission to perform this action.', 'gravityforms-drip' ) ) );
-		}
-
-		$api_token = isset( $_POST['api_token'] ) ? sanitize_text_field( wp_unslash( $_POST['api_token'] ) ) : '';
-		$account_id = isset( $_POST['account_id'] ) ? sanitize_text_field( wp_unslash( $_POST['account_id'] ) ) : '';
-
-		if ( empty( $api_token ) || empty( $account_id ) ) {
-			wp_send_json_error( array( 'message' => esc_html__( 'API token and Account ID are required.', 'gravityforms-drip' ) ) );
-		}
-
-		$result = $this->test_api_connection( $api_token, $account_id );
-
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
-		}
-
-		wp_send_json_success( array( 'message' => esc_html__( 'Connection successful! Your API credentials are valid.', 'gravityforms-drip' ) ) );
-	}
-
-	/**
 	 * Test API connection
 	 *
 	 * @param string $api_token  API token
@@ -530,9 +432,20 @@ class GF_Drip extends GFFeedAddOn {
 			return null;
 		}
 
-		// Determine both values based on which field is being validated.
-		$api_token  = ( 'api_token' === $field->name ) ? $value : rgpost( '_gaddon_setting_api_token' );
-		$account_id = ( 'account_id' === $field->name ) ? $value : rgpost( '_gaddon_setting_account_id' );
+		// Determine both values: check POST first (for live typing), then fall back to saved settings (for after save).
+		if ( 'api_token' === $field->name ) {
+			$api_token  = $value;
+			$account_id = rgpost( '_gaddon_setting_account_id' );
+			if ( rgblank( $account_id ) ) {
+				$account_id = $this->get_plugin_setting( 'account_id' );
+			}
+		} else {
+			$account_id = $value;
+			$api_token  = rgpost( '_gaddon_setting_api_token' );
+			if ( rgblank( $api_token ) ) {
+				$api_token = $this->get_plugin_setting( 'api_token' );
+			}
+		}
 
 		// If we still don't have both values, don't show an icon yet.
 		if ( rgblank( $api_token ) || rgblank( $account_id ) ) {
@@ -541,7 +454,16 @@ class GF_Drip extends GFFeedAddOn {
 
 		$result = $this->test_api_connection( $api_token, $account_id );
 
-		return ! is_wp_error( $result );
+		if ( is_wp_error( $result ) ) {
+			// Log the error so it appears in Gravity Forms logs.
+			$this->log_error( __METHOD__ . '(): Drip API validation failed. ' . $result->get_error_message() );
+
+			return false;
+		}
+
+		$this->log_debug( __METHOD__ . '(): Drip API credentials are valid.' );
+
+		return true;
 	}
 
 	/**
@@ -613,7 +535,7 @@ class GF_Drip extends GFFeedAddOn {
 					continue;
 				}
 
-				$field_value = rgar( $entry, $gf_field_id );
+					$field_value = rgar( $entry, $gf_field_id );
 				if ( $field_value === '' || $field_value === null ) {
 					continue;
 				}
