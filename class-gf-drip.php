@@ -251,16 +251,16 @@ class GF_Drip extends GFFeedAddOn {
 
 		$custom_fields = array(
 			array(
-				'name'                   => 'custom_fields',
-				'label'                  => esc_html__( 'Custom Fields', 'gravityforms-drip' ),
-				'type'                   => 'dynamic_field_map',
-				'key_field_label'        => esc_html__( 'Select a Drip field', 'gravityforms-drip' ),
-				'key_field_placeholder'  => esc_html__( 'Select a Drip field', 'gravityforms-drip' ),
-				'key_choices'            => $this->get_drip_custom_field_choices(),
-				'value_field_label'      => esc_html__( 'Form Field', 'gravityforms-drip' ),
-				'value_field_placeholder'=> esc_html__( 'Select a form field', 'gravityforms-drip' ),
-				'description'            => '<p>' . esc_html__( 'Map form fields to Drip custom fields. Select a Drip custom field from the dropdown (left column) and map it to a Gravity Forms field (right column).', 'gravityforms-drip' ) . '</p>',
-				'tooltip'                => '<h6>' . esc_html__( 'Custom Fields', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Map form fields to Drip custom fields. The left column shows the Drip custom field name, and the right column allows you to select the form field to map to it.', 'gravityforms-drip' ),
+				'name'                    => 'custom_fields',
+				'label'                   => esc_html__( 'Custom Fields', 'gravityforms-drip' ),
+				'type'                    => 'dynamic_field_map',
+				'key_field_label'         => esc_html__( 'Drip Field', 'gravityforms-drip' ),
+				'key_field_placeholder'   => esc_html__( 'Select a Drip field', 'gravityforms-drip' ),
+				'key_choices'             => array( $this, 'get_drip_custom_field_choices' ),
+				'value_field_label'       => esc_html__( 'Form Field', 'gravityforms-drip' ),
+				'value_field_placeholder' => esc_html__( 'Select a Value', 'gravityforms-drip' ),
+				'description'             => '<p>' . esc_html__( 'Map form fields to Drip custom fields. Select a Drip custom field from the dropdown (left column) and map it to a Gravity Forms field (right column).', 'gravityforms-drip' ) . '</p>',
+				'tooltip'                 => '<h6>' . esc_html__( 'Custom Fields', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Map form fields to Drip custom fields. The left column shows the Drip custom field name, and the right column allows you to select the form field to map to it.', 'gravityforms-drip' ),
 			),
 		);
 
@@ -271,18 +271,6 @@ class GF_Drip extends GFFeedAddOn {
 				'type'    => 'text',
 				'class'   => 'large',
 				'tooltip' => '<h6>' . esc_html__( 'Tags', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Enter tags separated by commas. These tags will be applied to the subscriber in Drip.', 'gravityforms-drip' ),
-			),
-			array(
-				'name'    => 'double_optin',
-				'label'   => esc_html__( 'Double Opt-In', 'gravityforms-drip' ),
-				'type'    => 'checkbox',
-				'choices' => array(
-					array(
-						'label' => esc_html__( 'Enable double opt-in', 'gravityforms-drip' ),
-						'name'  => 'double_optin',
-					),
-				),
-				'tooltip' => '<h6>' . esc_html__( 'Double Opt-In', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'If enabled, subscribers will receive a confirmation email before being added to Drip.', 'gravityforms-drip' ),
 			),
 			array(
 				'name'    => 'feed_condition',
@@ -661,14 +649,6 @@ class GF_Drip extends GFFeedAddOn {
 			if ( ! empty( $tags_array ) ) {
 				$subscriber_data['subscribers'][0]['tags'] = array_map( 'sanitize_text_field', $tags_array );
 			}
-		}
-
-		// Add double opt-in setting
-		// Checkbox stores "1" when checked, or the checkbox name value.
-		$double_optin = rgars( $feed, 'meta/double_optin' );
-		if ( ! empty( $double_optin ) && ( '1' === $double_optin || 'double_optin' === $double_optin ) ) {
-			$subscriber_data['subscribers'][0]['double_optin'] = true;
-			$this->log_debug( __METHOD__ . '(): Double opt-in enabled for this feed.' );
 		}
 
 		// Send to Drip API
