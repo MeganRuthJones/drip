@@ -9,7 +9,6 @@ A WordPress plugin that integrates Gravity Forms with the Drip email marketing p
 - **Multiple Feeds**: Support for multiple feeds per form with different settings
 - **Conditional Logic**: Send subscribers to Drip only when specific conditions are met
 - **Tag Support**: Automatically apply tags to subscribers in Drip
-- **Double Opt-In**: Optional double opt-in support for compliance
 - **Error Handling**: Comprehensive error logging and graceful failure handling
 - **Security**: Follows WordPress and Gravity Forms security best practices
 
@@ -58,7 +57,6 @@ A WordPress plugin that integrates Gravity Forms with the Drip email marketing p
    - **Standard Drip Fields**: Map form fields to standard Drip fields (first name, last name, phone, address, etc.)
    - **Custom Fields**: Map form fields to Drip custom fields
    - **Tags**: Enter comma-separated tags to apply to subscribers
-   - **Double Opt-In**: Enable if you want subscribers to confirm via email
    - **Conditional Logic**: Set conditions for when to send to Drip
 4. Save the feed
 
@@ -117,5 +115,4 @@ GPL-2.0+
 - Field mapping support
 - Conditional logic support
 - Tag support
-- Double opt-in support
 
