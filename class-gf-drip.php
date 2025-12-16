@@ -249,18 +249,26 @@ class GF_Drip extends GFFeedAddOn {
 			),
 		);
 
+		// Get Drip custom fields for the dropdown
+		$drip_custom_field_choices = $this->get_drip_custom_field_choices();
+		
 		$custom_fields = array(
 			array(
-				'name'                    => 'custom_fields',
-				'label'                   => esc_html__( 'Custom Fields', 'gravityforms-drip' ),
-				'type'                    => 'dynamic_field_map',
-				'key_field_label'         => esc_html__( 'Drip Field', 'gravityforms-drip' ),
-				'key_field_placeholder'   => esc_html__( 'Select a Drip field', 'gravityforms-drip' ),
-				'key_choices'             => array( $this, 'get_drip_custom_field_choices' ),
-				'value_field_label'       => esc_html__( 'Form Field', 'gravityforms-drip' ),
-				'value_field_placeholder' => esc_html__( 'Select a Value', 'gravityforms-drip' ),
-				'description'             => '<p>' . esc_html__( 'Map form fields to Drip custom fields. Select a Drip custom field from the dropdown (left column) and map it to a Gravity Forms field (right column).', 'gravityforms-drip' ) . '</p>',
-				'tooltip'                 => '<h6>' . esc_html__( 'Custom Fields', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Map form fields to Drip custom fields. The left column shows the Drip custom field name, and the right column allows you to select the form field to map to it.', 'gravityforms-drip' ),
+				'name'           => 'custom_fields',
+				'label'          => esc_html__( 'Custom Fields', 'gravityforms-drip' ),
+				'type'           => 'generic_map',
+				'key_field'      => array(
+					'allow_custom' => false,
+					'choices'      => $drip_custom_field_choices,
+					'placeholder'  => esc_html__( 'Select a Drip field', 'gravityforms-drip' ),
+				),
+				'value_field'    => array(
+					'allow_custom' => true,
+					'placeholder'  => esc_html__( 'Select a Value', 'gravityforms-drip' ),
+				),
+				'disable_custom' => true,
+				'description'    => '<p>' . esc_html__( 'Map form fields to Drip custom fields. Select a Drip custom field from the dropdown (left column) and map it to a Gravity Forms field (right column).', 'gravityforms-drip' ) . '</p>',
+				'tooltip'        => '<h6>' . esc_html__( 'Custom Fields', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Map form fields to Drip custom fields. The left column shows the Drip custom field name, and the right column allows you to select the form field to map to it.', 'gravityforms-drip' ),
 			),
 		);
 
@@ -622,22 +630,33 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		// Map custom fields.
-		// The dynamic_field_map setting stores an associative array of Drip field name => GF field ID.
+		// The generic_map setting stores an array of objects with 'key' (Drip field) and 'value' (GF field ID).
 		$custom_fields = rgars( $feed, 'meta/custom_fields' );
 		if ( ! empty( $custom_fields ) && is_array( $custom_fields ) ) {
 			$subscriber_data['subscribers'][0]['custom_fields'] = array();
 
-			foreach ( $custom_fields as $drip_field => $gf_field_id ) {
+			foreach ( $custom_fields as $mapped_field ) {
+				// Handle both old format (associative array) and new format (array of objects).
+				if ( isset( $mapped_field['key'] ) && isset( $mapped_field['value'] ) ) {
+					// New format: array of objects with 'key' and 'value'.
+					$drip_field  = $mapped_field['key'];
+					$gf_field_id = $mapped_field['value'];
+				} else {
+					// Old format: associative array (for backward compatibility).
+					$drip_field  = key( $mapped_field );
+					$gf_field_id = current( $mapped_field );
+				}
+
 				if ( empty( $drip_field ) || empty( $gf_field_id ) ) {
 					continue;
 				}
 
-					$field_value = rgar( $entry, $gf_field_id );
+				$field_value = rgar( $entry, $gf_field_id );
 				if ( $field_value === '' || $field_value === null ) {
 					continue;
 				}
 
-						$subscriber_data['subscribers'][0]['custom_fields'][ sanitize_text_field( $drip_field ) ] = sanitize_text_field( $field_value );
+				$subscriber_data['subscribers'][0]['custom_fields'][ sanitize_text_field( $drip_field ) ] = sanitize_text_field( $field_value );
 			}
 		}
 
