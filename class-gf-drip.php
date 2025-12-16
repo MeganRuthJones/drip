@@ -444,6 +444,10 @@ class GF_Drip extends GFFeedAddOn {
 			return $choices;
 		}
 
+		// Standard Drip fields that are already covered in the standard fields section
+		// These should be excluded from the custom fields dropdown
+		$standard_fields = array( 'email', 'first_name', 'last_name', 'phone', 'address', 'city', 'state', 'zip', 'country' );
+		
 		// Drip API returns custom_field_identifiers as an array of strings (field identifiers)
 		foreach ( $body['custom_field_identifiers'] as $field_identifier ) {
 			if ( empty( $field_identifier ) ) {
@@ -456,6 +460,11 @@ class GF_Drip extends GFFeedAddOn {
 				: $field_identifier;
 			
 			if ( empty( $identifier ) || ! is_string( $identifier ) ) {
+				continue;
+			}
+			
+			// Skip standard fields that are already covered in the standard fields section
+			if ( in_array( strtolower( $identifier ), array_map( 'strtolower', $standard_fields ), true ) ) {
 				continue;
 			}
 			
