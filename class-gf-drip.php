@@ -249,8 +249,11 @@ class GF_Drip extends GFFeedAddOn {
 			),
 		);
 
-		// Get Drip custom fields for the dropdown
-		$drip_custom_field_choices = $this->get_drip_custom_field_choices();
+		// Get Drip custom fields for the dropdown - ensure API is initialized first
+		$drip_custom_field_choices = array();
+		if ( $this->initialize_api() ) {
+			$drip_custom_field_choices = $this->get_drip_custom_field_choices();
+		}
 		
 		$custom_fields = array(
 			array(
@@ -439,10 +442,13 @@ class GF_Drip extends GFFeedAddOn {
 				continue;
 			}
 			$choices[] = array(
-				'label' => $field['id'],
-				'value' => $field['id'],
+				'value' => esc_attr( $field['id'] ),
+				'label' => esc_html( $field['id'] ),
 			);
 		}
+
+		// Log how many choices were loaded for debugging
+		$this->log_debug( __METHOD__ . '(): Loaded ' . count( $choices ) . ' Drip custom field choices.' );
 
 		return $choices;
 	}
@@ -761,6 +767,19 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		return $sanitized;
+	}
+
+	/**
+	 * Enable feed duplication.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param int|array $id The ID of the feed to be duplicated or the feed object when duplicating a form.
+	 *
+	 * @return bool
+	 */
+	public function can_duplicate_feed( $id ) {
+		return true;
 	}
 
 	/**
