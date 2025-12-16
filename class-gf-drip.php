@@ -444,13 +444,24 @@ class GF_Drip extends GFFeedAddOn {
 			return $choices;
 		}
 
-		foreach ( $body['custom_field_identifiers'] as $field ) {
-			if ( empty( $field['id'] ) ) {
+		// Drip API returns custom_field_identifiers as an array of strings (field identifiers)
+		foreach ( $body['custom_field_identifiers'] as $field_identifier ) {
+			if ( empty( $field_identifier ) ) {
 				continue;
 			}
+			
+			// Handle both string format (direct identifier) and object format (with 'id' key) for compatibility
+			$identifier = is_array( $field_identifier ) && isset( $field_identifier['id'] ) 
+				? $field_identifier['id'] 
+				: $field_identifier;
+			
+			if ( empty( $identifier ) || ! is_string( $identifier ) ) {
+				continue;
+			}
+			
 			$choices[] = array(
-				'value' => esc_attr( $field['id'] ),
-				'label' => esc_html( $field['id'] ),
+				'value' => esc_attr( $identifier ),
+				'label' => esc_html( $identifier ),
 			);
 		}
 
