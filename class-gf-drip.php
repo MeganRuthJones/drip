@@ -251,10 +251,16 @@ class GF_Drip extends GFFeedAddOn {
 
 		$custom_fields = array(
 			array(
-				'name'  => 'custom_fields',
-				'label' => esc_html__( 'Custom Fields', 'gravityforms-drip' ),
-				'type'  => 'dynamic_field_map',
-				'tooltip' => '<h6>' . esc_html__( 'Custom Fields', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Map form fields to Drip custom fields. The left column shows the Drip custom field name, and the right column allows you to select the form field to map to it.', 'gravityforms-drip' ),
+				'name'                   => 'custom_fields',
+				'label'                  => esc_html__( 'Custom Fields', 'gravityforms-drip' ),
+				'type'                   => 'dynamic_field_map',
+				'key_field_label'        => esc_html__( 'Select a Drip field', 'gravityforms-drip' ),
+				'key_field_placeholder'  => esc_html__( 'Select a Drip field', 'gravityforms-drip' ),
+				'key_choices'            => $this->get_drip_custom_field_choices(),
+				'value_field_label'      => esc_html__( 'Form Field', 'gravityforms-drip' ),
+				'value_field_placeholder'=> esc_html__( 'Select a form field', 'gravityforms-drip' ),
+				'description'            => '<p>' . esc_html__( 'Map form fields to Drip custom fields. Select a Drip custom field from the dropdown (left column) and map it to a Gravity Forms field (right column).', 'gravityforms-drip' ) . '</p>',
+				'tooltip'                => '<h6>' . esc_html__( 'Custom Fields', 'gravityforms-drip' ) . '</h6>' . esc_html__( 'Map form fields to Drip custom fields. The left column shows the Drip custom field name, and the right column allows you to select the form field to map to it.', 'gravityforms-drip' ),
 			),
 		);
 
@@ -375,6 +381,74 @@ class GF_Drip extends GFFeedAddOn {
 		$this->log_debug( __METHOD__ . '(): Drip API connection test successful.' );
 
 		return true;
+	}
+
+	/**
+	 * Get available Drip custom fields for use in the dynamic field map.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @return array
+	 */
+	public function get_drip_custom_field_choices() {
+		$choices = array();
+
+		// Make sure we have valid credentials before calling the API.
+		if ( ! $this->initialize_api() ) {
+			$this->log_debug( __METHOD__ . '(): Drip API could not be initialized. No custom fields loaded.' );
+			return $choices;
+		}
+
+		$account_id = $this->get_plugin_setting( 'account_id' );
+		$api_token  = $this->get_plugin_setting( 'api_token' );
+
+		if ( rgblank( $account_id ) || rgblank( $api_token ) ) {
+			return $choices;
+		}
+
+		// Attempt to fetch custom field identifiers from Drip.
+		$url      = sprintf( 'https://api.getdrip.com/v2/%s/custom_field_identifiers', sanitize_text_field( $account_id ) );
+		$response = wp_remote_get(
+			$url,
+			array(
+				'headers' => array(
+					'Authorization' => 'Basic ' . base64_encode( sanitize_text_field( $api_token ) . ':' ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+					'Content-Type'  => 'application/json',
+					'User-Agent'    => 'Gravity Forms Drip Add-On/' . $this->_version,
+				),
+				'timeout' => 15,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			$this->log_error( __METHOD__ . '(): Failed to retrieve Drip custom fields. ' . $response->get_error_message() );
+			return $choices;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( 200 !== $code ) {
+			$this->log_error( __METHOD__ . '(): Unexpected response code when retrieving Drip custom fields: ' . $code );
+			return $choices;
+		}
+
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( empty( $body['custom_field_identifiers'] ) || ! is_array( $body['custom_field_identifiers'] ) ) {
+			$this->log_debug( __METHOD__ . '(): No custom field identifiers found in Drip response.' );
+			return $choices;
+		}
+
+		foreach ( $body['custom_field_identifiers'] as $field ) {
+			if ( empty( $field['id'] ) ) {
+				continue;
+			}
+			$choices[] = array(
+				'label' => $field['id'],
+				'value' => $field['id'],
+			);
+		}
+
+		return $choices;
 	}
 
 	/**
@@ -575,7 +649,7 @@ class GF_Drip extends GFFeedAddOn {
 					continue;
 				}
 
-				$subscriber_data['subscribers'][0]['custom_fields'][ sanitize_text_field( $drip_field ) ] = sanitize_text_field( $field_value );
+						$subscriber_data['subscribers'][0]['custom_fields'][ sanitize_text_field( $drip_field ) ] = sanitize_text_field( $field_value );
 			}
 		}
 
@@ -590,9 +664,11 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		// Add double opt-in setting
+		// Checkbox stores "1" when checked, or the checkbox name value.
 		$double_optin = rgars( $feed, 'meta/double_optin' );
-		if ( ! empty( $double_optin ) ) {
+		if ( ! empty( $double_optin ) && ( '1' === $double_optin || 'double_optin' === $double_optin ) ) {
 			$subscriber_data['subscribers'][0]['double_optin'] = true;
+			$this->log_debug( __METHOD__ . '(): Double opt-in enabled for this feed.' );
 		}
 
 		// Send to Drip API
