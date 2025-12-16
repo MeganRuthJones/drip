@@ -406,7 +406,9 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		// Attempt to fetch custom field identifiers from Drip.
+		// Try the custom_field_identifiers endpoint first, fall back to custom_fields if needed.
 		$url      = sprintf( 'https://api.getdrip.com/v2/%s/custom_field_identifiers', sanitize_text_field( $account_id ) );
+		$this->log_debug( __METHOD__ . '(): Attempting to fetch custom fields from: ' . $url );
 		$response = wp_remote_get(
 			$url,
 			array(
@@ -425,15 +427,20 @@ class GF_Drip extends GFFeedAddOn {
 		}
 
 		$code = wp_remote_retrieve_response_code( $response );
+		$body_raw = wp_remote_retrieve_body( $response );
+		
 		if ( 200 !== $code ) {
-			$this->log_error( __METHOD__ . '(): Unexpected response code when retrieving Drip custom fields: ' . $code );
+			$this->log_error( __METHOD__ . '(): Unexpected response code when retrieving Drip custom fields: ' . $code . '. Response body: ' . $body_raw );
 			return $choices;
 		}
 
-		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+		$body = json_decode( $body_raw, true );
+
+		// Log the raw response for debugging
+		$this->log_debug( __METHOD__ . '(): Drip API response body: ' . print_r( $body, true ) );
 
 		if ( empty( $body['custom_field_identifiers'] ) || ! is_array( $body['custom_field_identifiers'] ) ) {
-			$this->log_debug( __METHOD__ . '(): No custom field identifiers found in Drip response.' );
+			$this->log_debug( __METHOD__ . '(): No custom field identifiers found in Drip response. Response keys: ' . ( is_array( $body ) ? implode( ', ', array_keys( $body ) ) : 'not an array' ) );
 			return $choices;
 		}
 
