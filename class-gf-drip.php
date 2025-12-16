@@ -615,7 +615,7 @@ class GF_Drip extends GFFeedAddOn {
 	public function process_feed( $feed, $entry, $form ) {
 		// Check if feed conditions are met
 		if ( ! $this->is_feed_condition_met( $feed, $form, $entry ) ) {
-			$this->log_debug( 'Feed condition not met. Skipping feed processing.' );
+			$this->log_debug( __METHOD__ . '(): Feed condition not met. Skipping feed processing.' );
 			return;
 		}
 
@@ -624,20 +624,29 @@ class GF_Drip extends GFFeedAddOn {
 		$account_id = $this->get_plugin_setting( 'account_id' );
 
 		if ( empty( $api_token ) || empty( $account_id ) ) {
-			$this->log_error( 'API credentials are not configured.' );
+			$this->add_feed_error( esc_html__( 'Feed was not processed because API credentials are not configured.', 'gravityforms-drip' ), $feed, $entry, $form );
+			$this->log_error( __METHOD__ . '(): API credentials are not configured.' );
 			return;
 		}
 
 		// Get email field
 		$email_field_id = rgars( $feed, 'meta/email' );
 		if ( empty( $email_field_id ) ) {
-			$this->log_error( 'Email field is not mapped in feed.' );
+			$this->add_feed_error( esc_html__( 'Feed was not processed because an email field is not mapped.', 'gravityforms-drip' ), $feed, $entry, $form );
+			$this->log_error( __METHOD__ . '(): Email field is not mapped in feed.' );
 			return;
 		}
 
 		$email = rgar( $entry, $email_field_id );
-		if ( empty( $email ) || ! is_email( $email ) ) {
-			$this->log_error( 'Invalid email address: ' . $email );
+		if ( empty( $email ) ) {
+			$this->add_feed_error( esc_html__( 'Feed was not processed because an email address was not provided.', 'gravityforms-drip' ), $feed, $entry, $form );
+			$this->log_error( __METHOD__ . '(): Email address was not provided.' );
+			return;
+		}
+
+		if ( ! is_email( $email ) ) {
+			$this->add_feed_error( sprintf( esc_html__( "Feed was not processed because '%s' is not a valid email address.", 'gravityforms-drip' ), $email ), $feed, $entry, $form );
+			$this->log_error( __METHOD__ . '(): Invalid email address: ' . $email );
 			return;
 		}
 
@@ -703,21 +712,32 @@ class GF_Drip extends GFFeedAddOn {
 			}
 		}
 
+		// Log subscriber data before sending (sanitized for privacy)
+		$log_data = $subscriber_data;
+		if ( isset( $log_data['subscribers'][0]['email'] ) ) {
+			$log_data['subscribers'][0]['email'] = sanitize_email( $log_data['subscribers'][0]['email'] );
+		}
+		$this->log_debug( __METHOD__ . '(): Attempting to send subscriber to Drip with data: ' . print_r( $log_data, true ) );
+
 		// Send to Drip API
-		$this->send_to_drip( $api_token, $account_id, $subscriber_data, $entry );
+		$this->send_to_drip( $api_token, $account_id, $subscriber_data, $entry, $feed, $form );
 	}
 
 	/**
 	 * Send subscriber data to Drip API
 	 *
-	 * @param string $api_token      API token
-	 * @param string $account_id     Account ID
+	 * @param string $api_token       API token
+	 * @param string $account_id      Account ID
 	 * @param array  $subscriber_data Subscriber data
-	 * @param array  $entry          Entry object
+	 * @param array  $entry           Entry object
+	 * @param array  $feed            Feed object
+	 * @param array  $form            Form object
 	 * @return void
 	 */
-	private function send_to_drip( $api_token, $account_id, $subscriber_data, $entry ) {
+	private function send_to_drip( $api_token, $account_id, $subscriber_data, $entry, $feed, $form ) {
 		$url = sprintf( 'https://api.getdrip.com/v2/%s/subscribers', $account_id );
+
+		$this->log_debug( __METHOD__ . '(): Sending request to Drip API: ' . $url );
 
 		$response = wp_remote_post(
 			$url,
@@ -733,7 +753,9 @@ class GF_Drip extends GFFeedAddOn {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			$this->log_error( 'Failed to send subscriber to Drip: ' . $response->get_error_message() );
+			$error_message = sprintf( esc_html__( 'Error subscribing to Drip: %s', 'gravityforms-drip' ), $response->get_error_message() );
+			$this->add_feed_error( $error_message, $feed, $entry, $form );
+			$this->log_error( __METHOD__ . '(): Failed to send subscriber to Drip: ' . $response->get_error_message() );
 			return;
 		}
 
@@ -742,12 +764,27 @@ class GF_Drip extends GFFeedAddOn {
 
 		if ( 201 !== $response_code && 200 !== $response_code ) {
 			$error_data = json_decode( $response_body, true );
-			$error_message = isset( $error_data['errors'][0]['message'] ) ? $error_data['errors'][0]['message'] : esc_html__( 'Unknown error occurred.', 'gravityforms-drip' );
-			$this->log_error( 'Drip API error (HTTP ' . $response_code . '): ' . $error_message );
+			$error_message = isset( $error_data['errors'][0]['message'] ) 
+				? $error_data['errors'][0]['message'] 
+				: sprintf( esc_html__( 'Unknown error occurred (HTTP %d).', 'gravityforms-drip' ), $response_code );
+			
+			$this->add_feed_error( sprintf( esc_html__( 'Error subscribing to Drip: %s', 'gravityforms-drip' ), $error_message ), $feed, $entry, $form );
+			$this->log_error( __METHOD__ . '(): Drip API error (HTTP ' . $response_code . '): ' . $error_message );
 			return;
 		}
 
-		$this->log_debug( 'Subscriber successfully sent to Drip: ' . $subscriber_data['subscribers'][0]['email'] );
+		// Success - log and add note to entry
+		$response_data = json_decode( $response_body, true );
+		$subscriber_id = isset( $response_data['subscribers'][0]['id'] ) ? $response_data['subscribers'][0]['id'] : '';
+		
+		$this->log_debug( __METHOD__ . '(): Subscriber successfully sent to Drip. Response: ' . json_encode( $response_data ) );
+		
+		if ( ! empty( $entry['id'] ) ) {
+			$note_message = ! empty( $subscriber_id ) 
+				? sprintf( esc_html__( 'Subscriber created in Drip. ID: %s', 'gravityforms-drip' ), $subscriber_id )
+				: esc_html__( 'Subscriber created in Drip.', 'gravityforms-drip' );
+			$this->add_note( $entry['id'], $note_message, 'success' );
+		}
 	}
 
 	/**
