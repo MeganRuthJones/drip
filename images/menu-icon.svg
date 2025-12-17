@@ -1,14 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-labelledby="title">
   <title>Drip</title>
-  <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#8e2de2;stop-opacity:1"/>
-      <stop offset="100%" style="stop-color:#4a00e0;stop-opacity:1"/>
-    </linearGradient>
-  </defs>
-  <circle cx="24" cy="24" r="22" fill="url(#grad)" />
-  <path fill="#ffffff" d="M24 10l-7 8c0 7 7 13 7 13s7-6 7-13l-7-8zm0 22c-4.4 0-8-3.6-8-8h3c0 2.8 2.2 5 5 5s5-2.2 5-5h3c0 4.4-3.6 8-8 8z"/>
+  <style type="text/css">
+    .st0{fill:#242748;}
+  </style>
+  <g transform="translate(6, 0.1) scale(1)">
+    <g id="logomark">
+      <path id="logo-mouth" class="st0" d="M36,29h-5.4c0,0.2,0,0.4,0,0.6c0,8-6.6,12.8-12.6,12.8S5.4,37.6,5.4,29.6c0-0.2,0-0.4,0-0.6
+        H0c0,0.2,0,0.4,0,0.6c0,11,9,18.2,18,18.2s18-7.2,18-18.2C36,29.4,36,29.2,36,29z">
+      </path>
+      <path id="logo-hat" class="st0" d="M18,6.8l3.8,5.2h6.8C25.4,7.8,22,3.6,18,0c-4,3.6-7.4,7.8-10.6,12h6.8L18,6.8z">
+      </path>
+      <g id="logo-eyes">
+        <ellipse id="logo-eye-left" class="st0" cx="7.2" cy="20.6" rx="3.6" ry="3.6">
+        </ellipse>
+        <ellipse id="logo-eye-center" class="st0" cx="18" cy="20.6" rx="3.6" ry="3.6">
+        </ellipse>
+        <ellipse id="logo-eye-right" class="st0" cx="28.8" cy="20.6" rx="3.6" ry="3.6">
+        </ellipse>
+      </g>
+    </g>
+  </g>
 </svg>
-
-
