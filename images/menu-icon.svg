@@ -2,13 +2,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-labelledby="title">
   <title>Drip</title>
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="dripGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#8e2de2;stop-opacity:1"/>
       <stop offset="100%" style="stop-color:#4a00e0;stop-opacity:1"/>
     </linearGradient>
   </defs>
-  <circle cx="24" cy="24" r="22" fill="url(#grad)" />
-  <path fill="#ffffff" d="M24 10l-7 8c0 7 7 13 7 13s7-6 7-13l-7-8zm0 22c-4.4 0-8-3.6-8-8h3c0 2.8 2.2 5 5 5s5-2.2 5-5h3c0 4.4-3.6 8-8 8z"/>
+  <!-- Background circle with gradient -->
+  <circle cx="24" cy="24" r="22" fill="url(#dripGradient)"/>
+  <!-- Drip droplet icon -->
+  <path fill="#ffffff" d="M24 8c-2.2 0-4 1.8-4 4v8c0 4.4 3.6 8 8 8s8-3.6 8-8v-8c0-2.2-1.8-4-4-4h-8zm0 28c-4.4 0-8-3.6-8-8h3c0 2.8 2.2 5 5 5s5-2.2 5-5h3c0 4.4-3.6 8-8 8z"/>
 </svg>
-
-

@@ -312,6 +312,27 @@ class GF_Drip extends GFFeedAddOn {
 	}
 
 	/**
+	 * Form settings page title
+	 *
+	 * @since 1.0.0
+	 * @return string Form Settings Title
+	 */
+	public function feed_settings_title() {
+		return esc_html__( 'Feed Settings', 'gravityforms-drip' );
+	}
+
+	/**
+	 * Return the plugin's icon for the plugin/form settings menu.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string
+	 */
+	public function get_menu_icon() {
+		return file_get_contents( $this->get_base_path() . '/images/menu-icon.svg' );
+	}
+
+	/**
 	 * Test API connection
 	 *
 	 * @param string $api_token  API token
