@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gravity Forms Drip Add-On
  * Plugin URI: 
- * Description: Integrates Gravity Forms with Drip email marketing platform
+ * Description: Integrates Gravity Forms with the Drip email marketing platform to create and update subscribers automatically.
  * Version: 1.0.0
  * Author: Megan Jones
  * Text Domain: gravityforms-drip
