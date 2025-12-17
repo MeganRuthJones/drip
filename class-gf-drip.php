@@ -133,6 +133,12 @@ class GF_Drip extends GFFeedAddOn {
 	 */
 	public function init() {
 		parent::init();
+
+		// Add filter to modify plugin row meta
+		add_filter( 'plugin_row_meta', array( $this, 'plugin_row_meta' ), 10, 2 );
+		
+		// Enqueue scripts and styles for the details popup
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
 	}
 
 	/**
@@ -874,5 +880,80 @@ class GF_Drip extends GFFeedAddOn {
 		$form = GFAPI::get_form( $form_id );
 
 		return is_wp_error( $form ) || empty( $form ) ? '' : esc_html( rgar( $form, 'title' ) );
+	}
+
+	/**
+	 * Modify plugin row meta to replace "Visit plugin site" with "View details"
+	 *
+	 * @param array  $plugin_meta Array of plugin meta links
+	 * @param string $plugin_file Plugin file path
+	 * @return array Modified plugin meta links
+	 */
+	public function plugin_row_meta( $plugin_meta, $plugin_file ) {
+		if ( $plugin_file !== $this->_path ) {
+			return $plugin_meta;
+		}
+
+		// Replace "Visit plugin site" with "View details"
+		foreach ( $plugin_meta as $key => $meta ) {
+			if ( strpos( $meta, 'Visit plugin site' ) !== false ) {
+				$plugin_meta[ $key ] = '<a href="#" class="gf-drip-view-details" data-plugin="' . esc_attr( $this->_slug ) . '">' . esc_html__( 'View details', 'gravityforms-drip' ) . '</a>';
+			}
+		}
+
+		return $plugin_meta;
+	}
+
+	/**
+	 * Enqueue admin scripts and styles for the details popup
+	 *
+	 * @return void
+	 */
+	public function enqueue_admin_scripts() {
+		$screen = get_current_screen();
+		if ( ! $screen || 'plugins' !== $screen->id ) {
+			return;
+		}
+
+		// Enqueue WordPress's built-in thickbox for modal
+		wp_enqueue_script( 'thickbox' );
+		wp_enqueue_style( 'thickbox' );
+
+		// Add inline script for the popup
+		$changelog = $this->get_changelog();
+		$popup_content = '<div id="gf-drip-details-popup" style="display:none;"><div class="gf-drip-changelog">' . wp_kses_post( $changelog ) . '</div></div>';
+
+		$script = "
+		jQuery(document).ready(function($) {
+			$('body').append('" . addslashes( $popup_content ) . "');
+			$(document).on('click', '.gf-drip-view-details', function(e) {
+				e.preventDefault();
+				tb_show('" . esc_js( $this->_title ) . " - " . esc_js( __( 'Changelog', 'gravityforms-drip' ) ) . "', '#TB_inline?inlineId=gf-drip-details-popup&width=600&height=500');
+			});
+		});
+		";
+
+		wp_add_inline_script( 'thickbox', $script );
+	}
+
+	/**
+	 * Get the changelog content
+	 *
+	 * @return string Changelog HTML
+	 */
+	private function get_changelog() {
+		$changelog = '<h3>' . esc_html__( 'Changelog', 'gravityforms-drip' ) . '</h3>';
+		$changelog .= '<div class="gf-drip-changelog-content">';
+		$changelog .= '<h4>1.0.0</h4>';
+		$changelog .= '<ul>';
+		$changelog .= '<li>' . esc_html__( 'Initial release', 'gravityforms-drip' ) . '</li>';
+		$changelog .= '<li>' . esc_html__( 'Basic integration with Drip API', 'gravityforms-drip' ) . '</li>';
+		$changelog .= '<li>' . esc_html__( 'Field mapping support', 'gravityforms-drip' ) . '</li>';
+		$changelog .= '<li>' . esc_html__( 'Conditional logic support', 'gravityforms-drip' ) . '</li>';
+		$changelog .= '<li>' . esc_html__( 'Tag support', 'gravityforms-drip' ) . '</li>';
+		$changelog .= '</ul>';
+		$changelog .= '</div>';
+
+		return $changelog;
 	}
 }
