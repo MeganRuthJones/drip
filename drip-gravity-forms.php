@@ -5,7 +5,6 @@
  * Description: Integrates Gravity Forms with Drip email marketing platform
  * Version: 1.0.0
  * Author: Megan Jones
- * Author URI: https://example.com
  * Text Domain: gravityforms-drip
  * Domain Path: /languages
  * Requires at least: 5.0

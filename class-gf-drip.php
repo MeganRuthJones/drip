@@ -137,8 +137,9 @@ class GF_Drip extends GFFeedAddOn {
 		// Add filter to modify plugin row meta
 		add_filter( 'plugin_row_meta', array( $this, 'plugin_row_meta' ), 10, 2 );
 		
-		// Add Settings link to plugin action links
-		add_filter( 'plugin_action_links_' . $this->_path, array( $this, 'plugin_action_links' ) );
+		// Add Settings link to plugin action links - use plugin basename
+		$plugin_basename = plugin_basename( GF_DRIP_PLUGIN_FILE );
+		add_filter( 'plugin_action_links_' . $plugin_basename, array( $this, 'plugin_action_links' ) );
 		
 		// Enqueue scripts and styles for the details popup
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
@@ -943,7 +944,9 @@ class GF_Drip extends GFFeedAddOn {
 	 * @return array Modified plugin meta links
 	 */
 	public function plugin_row_meta( $plugin_meta, $plugin_file ) {
-		if ( $plugin_file !== $this->_path ) {
+		// Check if this is our plugin using plugin basename
+		$plugin_basename = plugin_basename( GF_DRIP_PLUGIN_FILE );
+		if ( $plugin_file !== $plugin_basename ) {
 			return $plugin_meta;
 		}
 
@@ -975,18 +978,72 @@ class GF_Drip extends GFFeedAddOn {
 		wp_enqueue_script( 'thickbox' );
 		wp_enqueue_style( 'thickbox' );
 
-		// Add inline script for the popup
+		// Add inline styles for the changelog popup (without style tags)
+		$styles = "
+		.gf-drip-changelog {
+			padding: 20px;
+		}
+		.gf-drip-changelog h2 {
+			margin-top: 0;
+			margin-bottom: 20px;
+			font-size: 18px;
+			font-weight: 600;
+			line-height: 1.4;
+			color: #23282d;
+		}
+		.gf-drip-changelog-content {
+			background: #fff;
+			border: 1px solid #ccd0d4;
+			border-radius: 4px;
+			padding: 15px 20px;
+			margin-top: 15px;
+			box-shadow: 0 1px 1px rgba(0,0,0,.04);
+		}
+		.gf-drip-changelog-content h4 {
+			margin-top: 0;
+			margin-bottom: 12px;
+			font-size: 14px;
+			font-weight: 600;
+			color: #23282d;
+		}
+		.gf-drip-changelog-content ul {
+			margin: 0 0 0 20px;
+			padding: 0;
+			list-style-type: disc;
+		}
+		.gf-drip-changelog-content li {
+			margin-bottom: 8px;
+			line-height: 1.6;
+			color: #50575e;
+		}
+		";
+
+		// Add inline styles
+		wp_add_inline_style( 'thickbox', $styles );
+
+		// Get changelog content
 		$changelog = $this->get_changelog();
+		$popup_title = esc_js( $this->_title ) . ' v' . esc_js( $this->_version ) . ' ' . esc_js( __( 'Changelog', 'gravityforms-drip' ) );
 		$popup_content = '<div id="gf-drip-details-popup" style="display:none;"><div class="gf-drip-changelog">' . wp_kses_post( $changelog ) . '</div></div>';
 
+		// Add inline script for the popup
 		$script = "
-		jQuery(document).ready(function($) {
-			$('body').append('" . addslashes( $popup_content ) . "');
-			$(document).on('click', '.gf-drip-view-details', function(e) {
-				e.preventDefault();
-				tb_show('" . esc_js( $this->_title ) . " - " . esc_js( __( 'Changelog', 'gravityforms-drip' ) ) . "', '#TB_inline?inlineId=gf-drip-details-popup&width=600&height=500');
+		(function($) {
+			$(document).ready(function() {
+				// Add popup content to body if it doesn't exist
+				if ($('#gf-drip-details-popup').length === 0) {
+					$('body').append(" . json_encode( $popup_content ) . ");
+				}
+				
+				// Handle click on View details link
+				$(document).on('click', '.gf-drip-view-details', function(e) {
+					e.preventDefault();
+					if (typeof tb_show !== 'undefined') {
+						tb_show(" . json_encode( $popup_title ) . ", '#TB_inline?inlineId=gf-drip-details-popup&width=600&height=500');
+					}
+				});
 			});
-		});
+		})(jQuery);
 		";
 
 		wp_add_inline_script( 'thickbox', $script );
@@ -998,9 +1055,9 @@ class GF_Drip extends GFFeedAddOn {
 	 * @return string Changelog HTML
 	 */
 	private function get_changelog() {
-		$changelog = '<h3>' . esc_html__( 'Changelog', 'gravityforms-drip' ) . '</h3>';
+		$changelog = '<h2>' . esc_html( $this->_title ) . ' v' . esc_html( $this->_version ) . ' ' . esc_html__( 'Changelog', 'gravityforms-drip' ) . '</h2>';
 		$changelog .= '<div class="gf-drip-changelog-content">';
-		$changelog .= '<h4>1.0.0</h4>';
+		$changelog .= '<h4>' . esc_html( $this->_version ) . '</h4>';
 		$changelog .= '<ul>';
 		$changelog .= '<li>' . esc_html__( 'Initial release', 'gravityforms-drip' ) . '</li>';
 		$changelog .= '<li>' . esc_html__( 'Basic integration with Drip API', 'gravityforms-drip' ) . '</li>';
