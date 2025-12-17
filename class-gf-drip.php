@@ -137,6 +137,9 @@ class GF_Drip extends GFFeedAddOn {
 		// Add filter to modify plugin row meta
 		add_filter( 'plugin_row_meta', array( $this, 'plugin_row_meta' ), 10, 2 );
 		
+		// Add Settings link to plugin action links
+		add_filter( 'plugin_action_links_' . $this->_path, array( $this, 'plugin_action_links' ) );
+		
 		// Enqueue scripts and styles for the details popup
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
 	}
@@ -883,7 +886,19 @@ class GF_Drip extends GFFeedAddOn {
 	}
 
 	/**
-	 * Modify plugin row meta to replace "Visit plugin site" with "View details"
+	 * Add Settings link to plugin action links
+	 *
+	 * @param array $links Existing plugin action links
+	 * @return array Modified plugin action links
+	 */
+	public function plugin_action_links( $links ) {
+		$settings_link = '<a href="' . esc_url( admin_url( 'admin.php?page=gf_settings&subview=' . $this->_slug ) ) . '">' . esc_html__( 'Settings', 'gravityforms-drip' ) . '</a>';
+		array_unshift( $links, $settings_link );
+		return $links;
+	}
+
+	/**
+	 * Modify plugin row meta to add "View details" link
 	 *
 	 * @param array  $plugin_meta Array of plugin meta links
 	 * @param string $plugin_file Plugin file path
@@ -894,12 +909,15 @@ class GF_Drip extends GFFeedAddOn {
 			return $plugin_meta;
 		}
 
-		// Replace "Visit plugin site" with "View details"
+		// Remove "Visit plugin site" if it exists
 		foreach ( $plugin_meta as $key => $meta ) {
 			if ( strpos( $meta, 'Visit plugin site' ) !== false ) {
-				$plugin_meta[ $key ] = '<a href="#" class="gf-drip-view-details" data-plugin="' . esc_attr( $this->_slug ) . '">' . esc_html__( 'View details', 'gravityforms-drip' ) . '</a>';
+				unset( $plugin_meta[ $key ] );
 			}
 		}
+
+		// Add "View details" link
+		$plugin_meta[] = '<a href="#" class="gf-drip-view-details" data-plugin="' . esc_attr( $this->_slug ) . '">' . esc_html__( 'View details', 'gravityforms-drip' ) . '</a>';
 
 		return $plugin_meta;
 	}
