@@ -1,11 +1,10 @@
 <?php
 /**
  * Plugin Name: Gravity Forms Drip Add-On
- * Plugin URI: https://example.com/gravity-forms-drip
+ * Plugin URI: 
  * Description: Integrates Gravity Forms with Drip email marketing platform
  * Version: 1.0.0
- * Author: Your Name
- * Author URI: https://example.com
+ * Author: Megan Jones
  * Text Domain: gravityforms-drip
  * Domain Path: /languages
  * Requires at least: 5.0
