@@ -3,7 +3,7 @@
  * Gravity Forms Drip Add-On
  *
  * @package GF_Drip
- * @author  Your Name
+ * @author  Megan Jones
  * @version 1.0.0
  */
 
@@ -254,7 +254,7 @@ class GF_Drip extends GFFeedAddOn {
 		if ( $this->initialize_api() ) {
 			$drip_custom_field_choices = $this->get_drip_custom_field_choices();
 		}
-		
+
 		$custom_fields = array(
 			array(
 				'name'           => 'custom_fields',
@@ -684,12 +684,12 @@ class GF_Drip extends GFFeedAddOn {
 					continue;
 				}
 
-				$field_value = rgar( $entry, $gf_field_id );
+					$field_value = rgar( $entry, $gf_field_id );
 				if ( $field_value === '' || $field_value === null ) {
 					continue;
 				}
 
-				$subscriber_data['subscribers'][0]['custom_fields'][ sanitize_text_field( $drip_field ) ] = sanitize_text_field( $field_value );
+						$subscriber_data['subscribers'][0]['custom_fields'][ sanitize_text_field( $drip_field ) ] = sanitize_text_field( $field_value );
 			}
 		}
 
