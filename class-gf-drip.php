@@ -339,31 +339,31 @@ class GF_Drip extends GFFeedAddOn {
 	 * @return string SVG content or empty string on failure
 	 */
 	public function get_menu_icon() {
-		// Use plugin directory constant as primary path - this is the most reliable
-		// as it's defined in the main plugin file and works regardless of plugin folder name
-		$icon_path = GF_DRIP_PLUGIN_DIR . 'images/menu-icon.svg';
+		// Use plugin_dir_path with the main plugin file - this ensures the path is always
+		// relative to wherever the plugin is installed, regardless of folder name
+		$icon_path = plugin_dir_path( GF_DRIP_PLUGIN_FILE ) . 'images/menu-icon.svg';
 		
-		// Fallback paths in case the constant isn't available
-		$possible_paths = array(
-			$icon_path, // Primary: use plugin directory constant
-			$this->get_base_path() . '/images/menu-icon.svg', // Gravity Forms base path
-			dirname( $this->_full_path ) . '/images/menu-icon.svg', // Relative to class file
-		);
+		// Normalize path separators for cross-platform compatibility
+		$icon_path = wp_normalize_path( $icon_path );
 		
-		foreach ( $possible_paths as $path ) {
-			// Normalize path separators for cross-platform compatibility
-			$normalized_path = str_replace( array( '/', '\\' ), DIRECTORY_SEPARATOR, $path );
-			
-			if ( file_exists( $normalized_path ) ) {
-				$icon_content = file_get_contents( $normalized_path );
-				if ( false !== $icon_content && ! empty( $icon_content ) ) {
-					return $icon_content;
-				}
+		if ( file_exists( $icon_path ) ) {
+			$icon_content = file_get_contents( $icon_path );
+			if ( false !== $icon_content && ! empty( $icon_content ) ) {
+				return $icon_content;
+			}
+		}
+		
+		// Fallback: try using the plugin directory constant
+		$fallback_path = wp_normalize_path( GF_DRIP_PLUGIN_DIR . 'images/menu-icon.svg' );
+		if ( file_exists( $fallback_path ) ) {
+			$icon_content = file_get_contents( $fallback_path );
+			if ( false !== $icon_content && ! empty( $icon_content ) ) {
+				return $icon_content;
 			}
 		}
 		
 		// If we get here, log an error but don't break the plugin
-		$this->log_error( __METHOD__ . '(): Menu icon file not found. Tried paths: ' . implode( ', ', $possible_paths ) );
+		$this->log_error( __METHOD__ . '(): Menu icon file not found. Tried: ' . $icon_path . ' and ' . $fallback_path );
 		return '';
 	}
 
