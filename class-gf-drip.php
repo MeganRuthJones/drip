@@ -784,6 +784,7 @@ class GF_Drip extends GFFeedAddOn {
 				? sprintf( esc_html__( 'Subscriber created in Drip. ID: %s', 'gravityforms-drip' ), $subscriber_id )
 				: esc_html__( 'Subscriber created in Drip.', 'gravityforms-drip' );
 			$this->add_note( $entry['id'], $note_message, 'success' );
+			$this->log_debug( __METHOD__ . '(): Added success note to entry #' . $entry['id'] . ': ' . $note_message );
 		}
 	}
 
