@@ -940,9 +940,8 @@ class GF_Drip extends GFFeedAddOn {
 		wp_enqueue_script( 'thickbox' );
 		wp_enqueue_style( 'thickbox' );
 
-		// Add inline styles for the changelog popup
+		// Add inline styles for the changelog popup (without style tags)
 		$styles = "
-		<style>
 		.gf-drip-changelog {
 			padding: 20px;
 		}
@@ -979,22 +978,34 @@ class GF_Drip extends GFFeedAddOn {
 			line-height: 1.6;
 			color: #50575e;
 		}
-		</style>
 		";
 
-		// Add inline script for the popup
+		// Add inline styles
+		wp_add_inline_style( 'thickbox', $styles );
+
+		// Get changelog content
 		$changelog = $this->get_changelog();
+		$popup_title = esc_js( $this->_title ) . ' v' . esc_js( $this->_version ) . ' ' . esc_js( __( 'Changelog', 'gravityforms-drip' ) );
 		$popup_content = '<div id="gf-drip-details-popup" style="display:none;"><div class="gf-drip-changelog">' . wp_kses_post( $changelog ) . '</div></div>';
 
+		// Add inline script for the popup
 		$script = "
-		jQuery(document).ready(function($) {
-			$('head').append('" . addslashes( $styles ) . "');
-			$('body').append('" . addslashes( $popup_content ) . "');
-			$(document).on('click', '.gf-drip-view-details', function(e) {
-				e.preventDefault();
-				tb_show('" . esc_js( $this->_title ) . " v" . esc_js( $this->_version ) . " " . esc_js( __( 'Changelog', 'gravityforms-drip' ) ) . "', '#TB_inline?inlineId=gf-drip-details-popup&width=600&height=500');
+		(function($) {
+			$(document).ready(function() {
+				// Add popup content to body if it doesn't exist
+				if ($('#gf-drip-details-popup').length === 0) {
+					$('body').append(" . json_encode( $popup_content ) . ");
+				}
+				
+				// Handle click on View details link
+				$(document).on('click', '.gf-drip-view-details', function(e) {
+					e.preventDefault();
+					if (typeof tb_show !== 'undefined') {
+						tb_show(" . json_encode( $popup_title ) . ", '#TB_inline?inlineId=gf-drip-details-popup&width=600&height=500');
+					}
+				});
 			});
-		});
+		})(jQuery);
 		";
 
 		wp_add_inline_script( 'thickbox', $script );
