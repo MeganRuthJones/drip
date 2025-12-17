@@ -341,6 +341,7 @@ class GF_Drip extends GFFeedAddOn {
 	public function get_menu_icon() {
 		// Use plugin_dir_path with the main plugin file - this ensures the path is always
 		// relative to wherever the plugin is installed, regardless of folder name
+		// This matches the approach suggested in the prompt for bundled plugins
 		$icon_path = plugin_dir_path( GF_DRIP_PLUGIN_FILE ) . 'images/menu-icon.svg';
 		
 		// Normalize path separators for cross-platform compatibility
