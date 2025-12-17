@@ -137,8 +137,9 @@ class GF_Drip extends GFFeedAddOn {
 		// Add filter to modify plugin row meta
 		add_filter( 'plugin_row_meta', array( $this, 'plugin_row_meta' ), 10, 2 );
 		
-		// Add Settings link to plugin action links
-		add_filter( 'plugin_action_links_' . $this->_path, array( $this, 'plugin_action_links' ) );
+		// Add Settings link to plugin action links - use plugin basename
+		$plugin_basename = plugin_basename( GF_DRIP_PLUGIN_FILE );
+		add_filter( 'plugin_action_links_' . $plugin_basename, array( $this, 'plugin_action_links' ) );
 		
 		// Enqueue scripts and styles for the details popup
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
@@ -905,7 +906,9 @@ class GF_Drip extends GFFeedAddOn {
 	 * @return array Modified plugin meta links
 	 */
 	public function plugin_row_meta( $plugin_meta, $plugin_file ) {
-		if ( $plugin_file !== $this->_path ) {
+		// Check if this is our plugin using plugin basename
+		$plugin_basename = plugin_basename( GF_DRIP_PLUGIN_FILE );
+		if ( $plugin_file !== $plugin_basename ) {
 			return $plugin_meta;
 		}
 
