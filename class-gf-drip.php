@@ -322,6 +322,45 @@ class GF_Drip extends GFFeedAddOn {
 	}
 
 	/**
+	 * Form settings page title
+	 *
+	 * @since 1.0.0
+	 * @return string Form Settings Title
+	 */
+	public function feed_settings_title() {
+		return esc_html__( 'Feed Settings', 'gravityforms-drip' );
+	}
+
+	/**
+	 * Return the plugin's icon for the plugin/form settings menu.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @return string SVG content or empty string on failure
+	 */
+	public function get_menu_icon() {
+		// Try multiple path options to ensure it works on all sites
+		$possible_paths = array(
+			$this->get_base_path() . '/images/menu-icon.svg',
+			GF_DRIP_PLUGIN_DIR . 'images/menu-icon.svg',
+			dirname( $this->_full_path ) . '/images/menu-icon.svg',
+		);
+		
+		foreach ( $possible_paths as $icon_path ) {
+			if ( file_exists( $icon_path ) ) {
+				$icon_content = file_get_contents( $icon_path );
+				if ( false !== $icon_content ) {
+					return $icon_content;
+				}
+			}
+		}
+		
+		// If we get here, log an error but don't break the plugin
+		$this->log_error( __METHOD__ . '(): Menu icon file not found. Tried paths: ' . implode( ', ', $possible_paths ) );
+		return '';
+	}
+
+	/**
 	 * Test API connection
 	 *
 	 * @param string $api_token  API token
