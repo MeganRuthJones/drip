@@ -336,10 +336,28 @@ class GF_Drip extends GFFeedAddOn {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @return string
+	 * @return string SVG content or empty string on failure
 	 */
 	public function get_menu_icon() {
-		return file_get_contents( $this->get_base_path() . '/images/menu-icon.svg' );
+		// Try multiple path options to ensure it works on all sites
+		$possible_paths = array(
+			$this->get_base_path() . '/images/menu-icon.svg',
+			GF_DRIP_PLUGIN_DIR . 'images/menu-icon.svg',
+			dirname( $this->_full_path ) . '/images/menu-icon.svg',
+		);
+		
+		foreach ( $possible_paths as $icon_path ) {
+			if ( file_exists( $icon_path ) ) {
+				$icon_content = file_get_contents( $icon_path );
+				if ( false !== $icon_content ) {
+					return $icon_content;
+				}
+			}
+		}
+		
+		// If we get here, log an error but don't break the plugin
+		$this->log_error( __METHOD__ . '(): Menu icon file not found. Tried paths: ' . implode( ', ', $possible_paths ) );
+		return '';
 	}
 
 	/**
