@@ -1024,16 +1024,27 @@ class GF_Drip extends GFFeedAddOn {
 
 		// Ensure the Drip icon in the Gravity Forms settings navigation doesn't shrink
 		// when the sidebar is collapsed or space is constrained.
-		// This applies to both the general settings page and form-specific settings pages.
-		if ( in_array( $screen->id, array( 'forms_page_gf_settings', 'forms_page_gf_edit_forms' ), true ) ) {
+		// This applies to all Gravity Forms pages (settings, feeds, etc.)
+		// Check if we're on any Gravity Forms admin page
+		if ( strpos( $screen->id, 'forms_page_' ) === 0 || strpos( $screen->id, 'toplevel_page_gf_' ) === 0 ) {
 			$css = '
 			/* Prevent the Drip icon from being collapsed by flexbox in the GF Settings UI */
-			svg.gf-drip-icon {
+			/* Target the icon in all contexts: settings page, feed settings page, etc. */
+			svg.gf-drip-icon,
+			.gf-addon-menu-item svg.gf-drip-icon,
+			.gf-addon-menu-item[data-slug="gravityforms-drip"] svg,
+			#gform-settings-page svg.gf-drip-icon,
+			.gform-settings-page svg.gf-drip-icon {
+				flex-shrink: 0 !important;
+				min-width: 24px !important;
+				width: 24px !important;
+				height: 24px !important;
+				display: inline-block !important;
+			}
+			/* Also target any parent containers that might be causing shrinking */
+			.gf-addon-menu-item[data-slug="gravityforms-drip"] {
 				flex-shrink: 0;
 				min-width: 24px;
-				width: 24px;
-				height: 24px;
-				display: inline-block;
 			}
 			';
 
