@@ -1024,7 +1024,8 @@ class GF_Drip extends GFFeedAddOn {
 
 		// Ensure the Drip icon in the Gravity Forms settings navigation doesn't shrink
 		// when the sidebar is collapsed or space is constrained.
-		if ( 'forms_page_gf_settings' === $screen->id ) {
+		// This applies to both the general settings page and form-specific settings pages.
+		if ( in_array( $screen->id, array( 'forms_page_gf_settings', 'forms_page_gf_edit_forms' ), true ) ) {
 			$css = '
 			/* Prevent the Drip icon from being collapsed by flexbox in the GF Settings UI */
 			svg.gf-drip-icon {
