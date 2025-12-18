@@ -973,89 +973,113 @@ class GF_Drip extends GFFeedAddOn {
 	}
 
 	/**
-	 * Enqueue admin scripts and styles for the details popup
+	 * Enqueue admin scripts and styles for the details popup and settings UI.
 	 *
 	 * @return void
 	 */
 	public function enqueue_admin_scripts() {
 		$screen = get_current_screen();
-		if ( ! $screen || 'plugins' !== $screen->id ) {
+
+		if ( ! $screen ) {
 			return;
 		}
 
-		// Enqueue WordPress's built-in thickbox for modal
-		wp_enqueue_script( 'thickbox' );
-		wp_enqueue_style( 'thickbox' );
+		// Ensure the Drip icon in the Gravity Forms settings navigation doesn't shrink
+		// when the sidebar is collapsed or space is constrained.
+		if ( 'forms_page_gf_settings' === $screen->id ) {
+			$css = '
+			/* Prevent the Drip icon from being collapsed by flexbox in the GF Settings UI */
+			svg.gf-drip-icon {
+				flex-shrink: 0;
+				min-width: 24px;
+				width: 24px;
+				height: 24px;
+				display: inline-block;
+			}
+			';
 
-		// Add inline styles for the changelog popup (without style tags)
-		$styles = "
-		.gf-drip-changelog {
-			padding: 20px;
+			// Register a lightweight admin style handle for our inline CSS.
+			wp_register_style( 'gf-drip-admin', false );
+			wp_enqueue_style( 'gf-drip-admin' );
+			wp_add_inline_style( 'gf-drip-admin', $css );
 		}
-		.gf-drip-changelog h2 {
-			margin-top: 0;
-			margin-bottom: 20px;
-			font-size: 18px;
-			font-weight: 600;
-			line-height: 1.4;
-			color: #23282d;
-		}
-		.gf-drip-changelog-content {
-			background: #fff;
-			border: 1px solid #ccd0d4;
-			border-radius: 4px;
-			padding: 15px 20px;
-			margin-top: 15px;
-			box-shadow: 0 1px 1px rgba(0,0,0,.04);
-		}
-		.gf-drip-changelog-content h4 {
-			margin-top: 0;
-			margin-bottom: 12px;
-			font-size: 14px;
-			font-weight: 600;
-			color: #23282d;
-		}
-		.gf-drip-changelog-content ul {
-			margin: 0 0 0 20px;
-			padding: 0;
-			list-style-type: disc;
-		}
-		.gf-drip-changelog-content li {
-			margin-bottom: 8px;
-			line-height: 1.6;
-			color: #50575e;
-		}
-		";
 
-		// Add inline styles
-		wp_add_inline_style( 'thickbox', $styles );
+		// Scripts and styles for the plugin row "View details" popup on the Plugins screen.
+		if ( 'plugins' === $screen->id ) {
+			// Enqueue WordPress's built-in thickbox for modal
+			wp_enqueue_script( 'thickbox' );
+			wp_enqueue_style( 'thickbox' );
 
-		// Get changelog content
-		$changelog = $this->get_changelog();
-		$popup_title = esc_js( $this->_title ) . ' v' . esc_js( $this->_version ) . ' ' . esc_js( __( 'Changelog', 'gravityforms-drip' ) );
-		$popup_content = '<div id="gf-drip-details-popup" style="display:none;"><div class="gf-drip-changelog">' . wp_kses_post( $changelog ) . '</div></div>';
+			// Add inline styles for the changelog popup (without style tags)
+			$styles = "
+			.gf-drip-changelog {
+				padding: 20px;
+			}
+			.gf-drip-changelog h2 {
+				margin-top: 0;
+				margin-bottom: 20px;
+				font-size: 18px;
+				font-weight: 600;
+				line-height: 1.4;
+				color: #23282d;
+			}
+			.gf-drip-changelog-content {
+				background: #fff;
+				border: 1px solid #ccd0d4;
+				border-radius: 4px;
+				padding: 15px 20px;
+				margin-top: 15px;
+				box-shadow: 0 1px 1px rgba(0,0,0,.04);
+			}
+			.gf-drip-changelog-content h4 {
+				margin-top: 0;
+				margin-bottom: 12px;
+				font-size: 14px;
+				font-weight: 600;
+				color: #23282d;
+			}
+			.gf-drip-changelog-content ul {
+				margin: 0 0 0 20px;
+				padding: 0;
+				list-style-type: disc;
+			}
+			.gf-drip-changelog-content li {
+				margin-bottom: 8px;
+				line-height: 1.6;
+				color: #50575e;
+			}
+			";
 
-		// Add inline script for the popup
-		$script = "
-		(function($) {
-			$(document).ready(function() {
-				// Add popup content to body if it doesn't exist
-				if ($('#gf-drip-details-popup').length === 0) {
-					$('body').append(" . json_encode( $popup_content ) . ");
-				}
-				
-				// Handle click on View details link
-				$(document).on('click', '.gf-drip-view-details', function(e) {
-					e.preventDefault();
-					if (typeof tb_show !== 'undefined') {
-						tb_show(" . json_encode( $popup_title ) . ", '#TB_inline?inlineId=gf-drip-details-popup&width=600&height=500');
+			// Add inline styles
+			wp_add_inline_style( 'thickbox', $styles );
+
+			// Get changelog content
+			$changelog    = $this->get_changelog();
+			$popup_title  = esc_js( $this->_title ) . ' v' . esc_js( $this->_version ) . ' ' . esc_js( __( 'Changelog', 'gravityforms-drip' ) );
+			$popup_content = '<div id="gf-drip-details-popup" style="display:none;"><div class="gf-drip-changelog">' . wp_kses_post( $changelog ) . '</div></div>';
+
+			// Add inline script for the popup
+			$script = "
+			(function($) {
+				$(document).ready(function() {
+					// Add popup content to body if it doesn't exist
+					if ($('#gf-drip-details-popup').length === 0) {
+						$('body').append(" . json_encode( $popup_content ) . ");
 					}
+					
+					// Handle click on View details link
+					$(document).on('click', '.gf-drip-view-details', function(e) {
+						e.preventDefault();
+						if (typeof tb_show !== 'undefined') {
+							tb_show(" . json_encode( $popup_title ) . ", '#TB_inline?inlineId=gf-drip-details-popup&width=600&height=500');
+						}
+					});
 				});
-			});
-		})(jQuery);
-		";
+			})(jQuery);
+			";
 
-		wp_add_inline_script( 'thickbox', $script );
+			wp_add_inline_script( 'thickbox', $script );
+		}
 	}
 
 	/**
